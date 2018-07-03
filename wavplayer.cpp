@@ -83,8 +83,10 @@ struct AudioData{
 
 // global variable to keep track of playing state?? 
 bool isPlaying = false;
-// keep track of audiodevice id 
+// keep track of audiodevice id - only keep one around!
 SDL_AudioDeviceID currentDeviceID;
+// keep track of thread designated to play audio. 
+HANDLE audioThread;
 
 
 // define an audio callback that SDL_AudioSpec will use 
@@ -219,12 +221,15 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
+	isPlaying = true;
 	
-	while(audio.length > 0){
+	while(audio.length > 0 && isPlaying){
 		SDL_Delay(10); // set some delay so program doesn't immediately quit 
 	}
 	
-	// done playing audio 
+	//std::cout << "ending play" << std::endl;
+	
+	// done playing audio. make sure to free stuff. 
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
 	
@@ -298,27 +303,37 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	SDL_AudioDeviceID audioDevice;
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &karaokeAudio, NULL, 0);
 	
-	// save file 
-	//saveKaraokeWAV(modifiedData, &karaokeAudio, getFilename(file).c_str());
-	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
+	isPlaying = true;
 	
 	while(audio.length > 0 && isPlaying){
 		SDL_Delay(10); // set some delay so program doesn't immediately quit 
 	}
 	
-	// done playing audio 
+	// done playing audio. make sure to free stuff 
 	SDL_free(cvt.buf);
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
-	//SDL_Quit();
 	
 }
 
 // thread function to play audio 
 DWORD WINAPI playAudioProc(LPVOID lpParam){
-	playWavAudio(); // just play the audio 
+	std::string filename = std::string((char*)lpParam);
+	playWavAudio(filename);
+	//std::cout << "ending thread" << std::endl;
+	
+	// done playing 
+	isPlaying = false;
+	return 0;
+}
+
+// thread function to play karaoke audio 
+DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
+	std::string filename = std::string((char*)lpParam);
+	playKaraokeAudio(filename);
+	isPlaying = false;
 	return 0;
 }
 
@@ -332,28 +347,37 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			switch(LOWORD(wParam)){
 				
 				case ID_PLAY_BUTTON:
-				{
-					// play regular audio 
-					
-					// get the file first from the text area 
-					HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
-					int textLength = GetWindowTextLength(textbox);
-					TCHAR filename[textLength + 1];
-					GetWindowText(textbox, filename, textLength + 1);
-					std::string theFile = std::string(filename);
-					
-					//playWavAudio(theFile);
-					
-					// launch a thread to play the audio 
-					CreateThread(NULL, 0, playAudioProc, NULL, 0, 0);
-				   
-				}
+					{
+						// play regular audio 
+						if(!isPlaying){
+							
+							// get the file first from the text area 
+							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+							int textLength = GetWindowTextLength(textbox);
+							TCHAR filename[textLength + 1];
+							GetWindowText(textbox, filename, textLength + 1);
+						
+							// launch a thread to play the audio 
+							// pass the thread the file to play 
+							char* fname = (char*)(std::string(filename).c_str());
+							audioThread = CreateThread(NULL, 0, playAudioProc, fname, 0, 0);
+						}
+					}
 				break;
-				
 				case ID_PLAY_KARAOKE_BUTTON:
 					{
-						// implement me
-						std::cout << "heyyyyyyy" << std::endl;
+						if(!isPlaying){
+							// get the file first from the text area 
+							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+							int textLength = GetWindowTextLength(textbox);
+							TCHAR filename[textLength + 1];
+							GetWindowText(textbox, filename, textLength + 1);
+						
+							// launch a thread to play the audio 
+							// pass the thread the file to play 
+							char* fname = (char*)(std::string(filename).c_str());
+							audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, fname, 0, 0);
+						}
 					}
 					break;
 				case ID_PAUSE_BUTTON:
@@ -361,8 +385,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 					break;
 				case ID_STOP_BUTTON:
 					// implement me 
-					isPlaying = false;
-					SDL_CloseAudioDevice(currentDeviceID);
+					if(isPlaying){
+						isPlaying = false;
+						SDL_CloseAudioDevice(currentDeviceID);
+					}
 					break;
 				case ID_SAVE_KARAOKE:
 					// implement me 
