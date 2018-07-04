@@ -75,19 +75,20 @@ HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARS
       DEFAULT_PITCH | FF_DONTCARE, TEXT("Tahoma")
 );
 
+// global variable to keep track of playing state?? 
+bool isPlaying = false;
+
+// keep track of audiodevice id - only keep one around!
+SDL_AudioDeviceID currentDeviceID;
+
+// keep track of thread designated to play audio. 
+HANDLE audioThread;
+
 // audio data struct that callback will use 
 struct AudioData{
 	Uint8* position;
 	Uint32 length;
 };
-
-// global variable to keep track of playing state?? 
-bool isPlaying = false;
-// keep track of audiodevice id - only keep one around!
-SDL_AudioDeviceID currentDeviceID;
-// keep track of thread designated to play audio. 
-HANDLE audioThread;
-
 
 // define an audio callback that SDL_AudioSpec will use 
 void audioCallback(void* userData, Uint8* stream, int length){
@@ -212,12 +213,8 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 	SDL_AudioDeviceID audioDevice;
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
 	
-	
-	
 	// update global audiodevice id variable 
 	currentDeviceID = audioDevice;
-	
-	
 	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
@@ -302,6 +299,7 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	
 	SDL_AudioDeviceID audioDevice;
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &karaokeAudio, NULL, 0);
+	currentDeviceID = audioDevice;
 	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
@@ -359,7 +357,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 						
 							// launch a thread to play the audio 
 							// pass the thread the file to play 
-							char* fname = (char*)(std::string(filename).c_str());
+							char* fname = (char*)(filename);
 							audioThread = CreateThread(NULL, 0, playAudioProc, fname, 0, 0);
 						}
 					}
@@ -375,7 +373,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 						
 							// launch a thread to play the audio 
 							// pass the thread the file to play 
-							char* fname = (char*)(std::string(filename).c_str());
+							char* fname = (char*)(filename);
 							audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, fname, 0, 0);
 						}
 					}
