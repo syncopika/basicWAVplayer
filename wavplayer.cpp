@@ -10,46 +10,6 @@
 // give some identifiers for the GUI components 
 #include "resources.h"
 
-// some resources I visited 
-// https://adamtcroft.com/playing-sound-with-sdl-c/
-// https://davidgow.net/handmadepenguin/ch7.html
-// https://gigi.nullneuron.net/gigilabs/playing-a-wav-file-using-sdl2/
-// https://forums.libsdl.org/viewtopic.php?p=50240
-// https://stackoverflow.com/questions/10110905/simple-sound-wave-generator-with-sdl-in-c
-// https://stackoverflow.com/questions/8258398/c-how-to-combine-two-signed-8-bit-numbers-to-a-16-bit-short-unexplainable-res
-// https://stackoverflow.com/questions/28632721/does-16bit-integer-pcm-data-mean-its-signed-or-unsigned
-// https://stackoverflow.com/questions/34897166/sdl2-audio-callback-restricted-to-8bit
-// https://opensource.apple.com/source/IOAudioFamily/IOAudioFamily-183.4.2/Examples/Templates/SamplePCIAudioDriver/SampleAudioClip.cpp.auto.html
-// https://stackoverflow.com/questions/15087668/how-to-convert-pcm-samples-in-byte-array-as-floating-point-numbers-in-the-range
-// https://stackoverflow.com/questions/46177712/convert-int16-array-to-float
-
-
-// wav file info 
-// http://www.cplusplus.com/forum/general/205408/
-// https://stackoverflow.com/questions/29416260/incorrect-audio-data-when-saving-wav-file-using-c-based-on-a-c-sharp-program
-// https://stackoverflow.com/questions/31024177/export-buffer-to-wav-in-c
-// https://stackoverflow.com/questions/24539510/write-wave-header-and-add-data-without-closing-ofstream
-// http://www.cplusplus.com/forum/beginner/166954/
-
-// pitch/time scaling 
-// https://en.wikipedia.org/wiki/Audio_time_stretching_and_pitch_scaling
-// https://www.dsprelated.com/showthread/comp.dsp/50777-1.php
-// https://dsp.stackexchange.com/questions/45794/how-to-change-speed-of-audio-samples-without-changing-pitch
-// https://www.surina.net/article/time-and-pitch-scaling.html
-// https://stackoverflow.com/questions/5156192/programmatically-increase-the-pitch-of-an-array-of-audio-samples
-
-// https://www.surina.net/soundtouch/
-// https://softwarerecs.stackexchange.com/questions/36289/c-c-library-for-changing-pitch-without-altering-formant-frequencies
-
-
-// with a gui, need to handle music stuff in another thread cause it'll block 
-// https://forums.libsdl.org/viewtopic.php?p=40771
-
-// multithreading with win32 
-// https://stackoverflow.com/questions/4768294/multithreading-in-c
-// https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createthread
-// https://msdn.microsoft.com/en-us/f0dc203f-200e-42f1-940c-24e3fe080175
-
 /* features to add 
 
 pretty helpful: https://github.com/syncopika/syncopika.github.io/blob/master/misc/karaokeget.html
@@ -84,6 +44,28 @@ SDL_AudioDeviceID currentDeviceID;
 // keep track of thread designated to play audio. 
 HANDLE audioThread;
 
+// get the name of the file 
+std::string getFilename(std::string file){
+	
+	// find the last instance of a slash, if any 
+	// if there isn't any, then just return file
+	size_t lastSlashIndex = 0;
+	lastSlashIndex = file.find_last_of('\\');
+	
+	// getting just the length of the file's name
+	// need to add 1 because of 0-index, subract 4 for .wav 
+	int filenameLength = file.size() - (lastSlashIndex + 1) - 4; 
+	
+	if(lastSlashIndex != std::string::npos){
+		// get file name
+		return file.substr(lastSlashIndex+1, filenameLength); 
+	}else{
+		// no slash found - just remove the .wav extension 
+		return file.substr(0, file.size() - 4);
+	}
+	
+}
+
 // audio data struct that callback will use 
 struct AudioData{
 	Uint8* position;
@@ -115,12 +97,75 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	audio->length -= len;
 }
 
+// convert data to 32-bit float karaoke audio for 1 channel 
+// need to pass it the data and the length of the data 
+std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength){
+	
+	// convert audio data to F32 
+	SDL_AudioCVT cvt;
+	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, 48000, AUDIO_F32, 2, 48000);
+	cvt.len = wavLength;
+	cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
+	
+	// copy current audio data to the buffer (dest, src, len)
+	SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
+	SDL_ConvertAudio(&cvt);
+	
+	// audio data is now in float form!
+	float* newData = (float *)cvt.buf;
+
+	std::vector<float> leftChannel;
+	std::vector<float> rightChannel;
+	
+	// divide by 4 since cvt.len_cvt is total bytes of the buffer, and 4 bytes per float
+	int floatBufLen = (int)cvt.len_cvt / 4;
+	int count = 0; // if 0, left channel. 1 for right channel 
+	for(int i = 0; i < floatBufLen; i++){
+		if(count == 0){
+			leftChannel.push_back(newData[i]);
+			count++;
+		}else{
+			rightChannel.push_back(newData[i]);
+			count--;
+		}
+	}
+	
+	// now eliminate the vocal by getting the diff between left and right and dividing by 2 
+	std::vector<float> modifiedData;
+	for(int j = 0; j < (int)leftChannel.size(); j++){
+		float temp = (leftChannel[j] - rightChannel[j]) / 2.0;
+		modifiedData.push_back(temp);
+	}
+	
+	// make sure to free allocated space!
+	SDL_free(cvt.buf);
+	
+	return modifiedData;
+}
+
 // save file as wav 
-void saveKaraokeWAV(std::vector<float> audioData, SDL_AudioSpec* audioInfo, const char* filename){
+void saveKaraokeWAV(const char* filename){
+	
+	// set up an AudioSpec to load in the file 
+	SDL_AudioSpec wavSpec;
+	Uint8* wavStart;
+	Uint32 wavLength;
+	
+	// load the wav file and some of its properties to the specified variables 
+	if(SDL_LoadWAV(filename, &wavSpec, &wavStart, &wavLength) == NULL){
+		std::cout << "couldn't load wav file" << std::endl;
+		return;
+	}
+	
+	std::vector<float> audioData = convertToKaraoke(wavStart, wavLength);
 	
 	// get string name 
 	std::string file(filename);
+	//std::cout << "file name: " << file << std::endl;
+	file = getFilename(file);
 	file = "OFF_VOCAL_" + file + ".wav";
+	std::cout << "saving file as: " << file << std::endl;
+	//std::cout << "size of audioData: " << audioData.size() << std::endl;
 	
 	std::ofstream stream; // create an output file stream 
 	stream.open(file.c_str(), std::ios::binary); 
@@ -131,7 +176,7 @@ void saveKaraokeWAV(std::vector<float> audioData, SDL_AudioSpec* audioInfo, cons
 	int32_t formatSize = 16;
 	int16_t pcm = 1;
 	int16_t numChannels = 1;
-	int32_t sampleRate = audioInfo->freq;
+	int32_t sampleRate = 48000;
 	int32_t byteRate = sampleRate * 2; 
 	int16_t bitsPerSample = 16; 			// 16-bit pcm wav 
 	int16_t frameSize = numChannels * 2; 	// block align
@@ -161,29 +206,8 @@ void saveKaraokeWAV(std::vector<float> audioData, SDL_AudioSpec* audioInfo, cons
 		}
 		stream.write(reinterpret_cast<char *>(&m2), sizeof(int16_t));
 	}
-
-}
-
-// get the name of the file 
-std::string getFilename(std::string file){
 	
-	// find the last instance of a slash, if any 
-	// if there isn't any, then just return file
-	size_t lastSlashIndex = 0;
-	lastSlashIndex = file.find_last_of('\\');
-	
-	// getting just the length of the file's name
-	// need to add 1 because of 0-index, subract 4 for .wav 
-	int filenameLength = file.size() - (lastSlashIndex + 1) - 4; 
-	
-	if(lastSlashIndex != std::string::npos){
-		// get file name
-		return file.substr(lastSlashIndex+1, filenameLength); 
-	}else{
-		// no slash found - just remove the .wav extension 
-		return file.substr(0, file.size() - 4);
-	}
-	
+	SDL_FreeWAV(wavStart);
 }
 
 
@@ -247,42 +271,12 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 		return;
 	}
 	
-	// convert audio data to F32 
-	SDL_AudioCVT cvt;
-	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, 48000, AUDIO_F32, 2, 48000);
-	cvt.len = wavLength;
-	cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
+	std::vector<float> modifiedData = convertToKaraoke(wavStart, wavLength);
 	
-	// copy current audio data to the buffer (dest, src, len)
-	SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
-	SDL_ConvertAudio(&cvt);
+	AudioData audio;
+	audio.position = (Uint8*)modifiedData.data(); 
+	audio.length = (Uint32)(modifiedData.size() * sizeof(float));
 	
-	// audio data is now in float form!
-	float* newData = (float *)cvt.buf;
-
-	std::vector<float> leftChannel;
-	std::vector<float> rightChannel;
-	
-	// divide by 4 since cvt.len_cvt is total bytes of the buffer, and 4 bytes per float
-	int floatBufLen = (int)cvt.len_cvt / 4;
-	int count = 0; // if 0, left channel. 1 for right channel 
-	for(int i = 0; i < floatBufLen; i++){
-		if(count == 0){
-			leftChannel.push_back(newData[i]);
-			count++;
-		}else{
-			rightChannel.push_back(newData[i]);
-			count--;
-		}
-	}
-	
-	// now eliminate the vocal by getting the diff between left and right and dividing by 2 
-	std::vector<float> modifiedData;
-	for(int j = 0; j < (int)leftChannel.size(); j++){
-		float temp = (leftChannel[j] - rightChannel[j]) / 2.0;
-		modifiedData.push_back(temp);
-	}
-		
 	// set up another SDL_AudioSpec with 1 channel to play the modified audio buffer of wavSpec
 	SDL_AudioSpec karaokeAudio;
 	karaokeAudio.freq = wavSpec.freq;
@@ -290,11 +284,6 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	karaokeAudio.channels = 1;
 	karaokeAudio.samples = wavSpec.samples;
 	karaokeAudio.callback = audioCallback;
-	
-	AudioData audio;
-	audio.position = (Uint8*)modifiedData.data(); 
-	audio.length = (Uint32)(modifiedData.size() * sizeof(float));
-	
 	karaokeAudio.userdata = &audio; // attach modified audio data to audio spec 
 	
 	SDL_AudioDeviceID audioDevice;
@@ -310,7 +299,6 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	}
 	
 	// done playing audio. make sure to free stuff 
-	SDL_free(cvt.buf);
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
 	
@@ -320,7 +308,6 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 DWORD WINAPI playAudioProc(LPVOID lpParam){
 	std::string filename = std::string((char*)lpParam);
 	playWavAudio(filename);
-	//std::cout << "ending thread" << std::endl;
 	
 	// done playing 
 	isPlaying = false;
@@ -332,6 +319,12 @@ DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
 	std::string filename = std::string((char*)lpParam);
 	playKaraokeAudio(filename);
 	isPlaying = false;
+	return 0;
+}
+
+// thread function to save karaoke audio 
+DWORD WINAPI saveKaraokeAudio(LPVOID lpParam){
+	saveKaraokeWAV((char*)lpParam);
 	return 0;
 }
 
@@ -377,20 +370,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 							audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, fname, 0, 0);
 						}
 					}
-					break;
+				break;
 				case ID_PAUSE_BUTTON:
 					// implement me 
 					break;
 				case ID_STOP_BUTTON:
-					// implement me 
-					if(isPlaying){
-						isPlaying = false;
-						SDL_CloseAudioDevice(currentDeviceID);
+					{
+						// implement me 
+						if(isPlaying){
+							isPlaying = false;
+							SDL_CloseAudioDevice(currentDeviceID);
+						}
 					}
-					break;
+				break;
 				case ID_SAVE_KARAOKE:
-					// implement me 
-					break;
+					{
+						// implement me 
+						HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+						int textLength = GetWindowTextLength(textbox);
+						TCHAR filename[textLength + 1];
+						GetWindowText(textbox, filename, textLength + 1);
+						char* fname = (char*)(filename);
+						
+						// Y U NO OUTPUT!?? - see: https://stackoverflow.com/questions/40500616/c-11-stdthread-use-ofstream-output-stuff-but-get-nothing-why
+						// https://stackoverflow.com/questions/11779504/join-equivalent-in-windows
+						HANDLE saveThread = CreateThread(NULL, 0, saveKaraokeAudio, fname, 0, 0);
+						// need to wait for this thread to finish!
+						// otherwise this iteration of the message loop will be done right away and the thread dies prematurely 
+						WaitForSingleObject(saveThread, INFINITE);
+					}
+				break;
 			}
 			break;
 		break;
