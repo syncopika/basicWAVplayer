@@ -4,8 +4,8 @@
 CXX = g++ 
 
 # the path to the lib folder of SDL is C:\mingw_dev_lib\lib
-SDL_LIB = -LC:\mingw_dev_lib\lib -lSDL2main -lSDL2
-SDL_INCLUDE = -IC:\mingw_dev_lib\include\SDL2
+SDL_LIB = -LC:\SDL2-2.0.7\i686-w64-mingw32\lib -lSDL2main -lSDL2
+SDL_INCLUDE = -IC:\SDL2-2.0.7\i686-w64-mingw32\include\SDL2
 
 # set up flags 
 CFLAGS = -Wall -c -std=c++14 $(SDL_INCLUDE)
