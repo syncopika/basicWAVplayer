@@ -27,6 +27,9 @@ pretty helpful: https://github.com/syncopika/syncopika.github.io/blob/master/mis
 
 */
 
+// enum for current play state 
+enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED };
+
 // register window 
 const char g_szClassName[] = "mainGUI";
 
@@ -41,7 +44,7 @@ HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARS
 );
 
 // global variable to keep track of playing state?? 
-bool isPlaying = false;
+PlayState currentState = IS_STOPPED;
 
 // keep track of audiodevice id - only keep one around!
 SDL_AudioDeviceID currentDeviceID;
@@ -189,11 +192,9 @@ void saveKaraokeWAV(const char* filename){
 	
 	// get string name 
 	std::string file(filename);
-	//std::cout << "file name: " << file << std::endl;
 	file = getFilename(file);
 	file = "OFF_VOCAL_" + file + ".wav";
 	std::cout << "saving file as: " << file << std::endl;
-	//std::cout << "size of audioData: " << audioData.size() << std::endl;
 	
 	std::ofstream stream; // create an output file stream 
 	stream.open(file.c_str(), std::ios::binary); 
@@ -276,15 +277,14 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
-	isPlaying = true;
+	currentState = IS_PLAYING;
 	
-	while(audio.length > 0 && isPlaying){
+	while(audio.length > 0){
 		SDL_Delay(100); // set some delay so program doesn't immediately quit 
 	}
 	
-	//std::cout << "ending play" << std::endl;
-	
 	// done playing audio. make sure to free stuff. 
+	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
 	
@@ -326,13 +326,14 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	
 	// play 
 	SDL_PauseAudioDevice(audioDevice, 0);
-	isPlaying = true;
+	currentState = IS_PLAYING;
 	
-	while(audio.length > 0 && isPlaying){
+	while(audio.length > 0){
 		SDL_Delay(100); // set some delay so program doesn't immediately quit 
 	}
 	
 	// done playing audio. make sure to free stuff 
+	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
 	
@@ -351,7 +352,7 @@ DWORD WINAPI playAudioProc(LPVOID lpParam){
 	// done playing 
 	delete audioParams->filename;
 	delete audioParams;
-	isPlaying = false;
+	
 	return 0;
 }
 
@@ -367,7 +368,7 @@ DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
 	
 	delete audioParams->filename;
 	delete audioParams;
-	isPlaying = false;
+	
 	return 0;
 }
 
@@ -388,8 +389,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 				
 				case ID_PLAY_BUTTON:
 					{
+						std::cout << "the current state is: " << currentState << std::endl;
 						// play regular audio 
-						if(!isPlaying){
+						if(currentState == IS_STOPPED){
 							
 							// get the file first from the text area 
 							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
@@ -430,12 +432,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 							audioParams->sampleRate = sampleRate;
 							
 							audioThread = CreateThread(NULL, 0, playAudioProc, audioParams, 0, 0);
+						}else if(currentState == IS_PAUSED){
+							// start up paused audio device again
+							std::cout << "starting where we left off..." << std::endl;
+							SDL_PauseAudioDevice(currentDeviceID, 0);
+							currentState = IS_PLAYING;
 						}
 					}
-				break;
+					break;
 				case ID_PLAY_KARAOKE_BUTTON:
 					{
-						if(!isPlaying){
+						if(currentState == IS_STOPPED){
 							
 							// get the file first from the text area 
 							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
@@ -476,18 +483,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 							audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, audioParams, 0, 0);
 						}
 					}
-				break;
+					break;
 				case ID_PAUSE_BUTTON:
 					// implement me 
+					{
+						if(currentState == IS_PLAYING){
+							
+							currentState = IS_PAUSED;
+						
+							// halt the audio device callback function 
+							SDL_PauseAudioDevice(currentDeviceID, 1);
+						}
+					}
 					break;
 				case ID_STOP_BUTTON:
 					{
-						if(isPlaying){
-							isPlaying = false;
+						std::cout << "the current state is: " << currentState << std::endl;
+						if(currentState != IS_STOPPED){
+							currentState = IS_STOPPED;
 							SDL_CloseAudioDevice(currentDeviceID);
 						}
 					}
-				break;
+					break;
 				case ID_SAVE_KARAOKE:
 					{
 						HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
@@ -504,10 +521,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 						// otherwise this iteration of the message loop will be done right away and the thread dies prematurely 
 						WaitForSingleObject(saveThread, INFINITE);
 					}
-				break;
+					break;
 			}
 			break;
-		break;
 		case WM_CLOSE:
 			{
 				SDL_Quit();
@@ -571,7 +587,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 	
 	// define all the window components (i.e. buttons, text fields)
-	
 	// this is the main window 
 	hwnd = CreateWindowEx(
 		WS_EX_CLIENTEDGE,
@@ -614,7 +629,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		NULL
 	);
 	SendMessage(addWAVPath, WM_SETFONT, (WPARAM)hFont, true);
-	
 	
 	// specify sample rate
 	HWND addSampleRateLabel = CreateWindow(
