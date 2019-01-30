@@ -7,9 +7,13 @@
 #include <fcntl.h>
 #include <SDL.h>
 #include <windows.h>
+#include <stdlib.h>
 
 // give some identifiers for the GUI components 
 #include "resources.h"
+
+// pitch shifting code by Stephan Bernsee 
+#include "smbPitchShift.h"
 
 // default sample rate 
 #define DEF_SAMPLE_RATE 44100
@@ -126,6 +130,51 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	
 	audio->position += len;
 	audio->length -= len;
+}
+
+// try pitch shifting?? :/
+// https://www.kvraudio.com/forum/viewtopic.php?t=134637
+// https://www.kvraudio.com/forum/viewtopic.php?t=349092
+// it works, but IS SLOWWWWW! just don't think it's broken...
+// use gdb to run it and check
+std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
+	
+	// convert audio data to F32 
+	SDL_AudioCVT cvt;
+	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 1, DEF_SAMPLE_RATE, AUDIO_F32, 1, DEF_SAMPLE_RATE);
+	cvt.len = wavLength;
+	cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
+	
+	// copy current audio data to the buffer (dest, src, len)
+	SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
+	SDL_ConvertAudio(&cvt);
+	
+	// audio data is now in float form!
+	float* newData = (float*)cvt.buf;
+	//float* newData2 = (float*)malloc((int)cvt.len_cvt);
+	
+	int floatBufLen = (int)cvt.len_cvt / 4;
+	std::cout << (int)cvt.len_cvt << std::endl;
+	
+	long numSampsToProcess = (long)floatBufLen;
+	float sampleRate = (float)DEF_SAMPLE_RATE;
+	long fftFrameSize = 1024;
+	long osamp = 32;
+
+	// do the pitch shift up
+	smbPitchShift(1.5, numSampsToProcess, fftFrameSize, osamp, sampleRate, newData, newData);
+	
+	// output
+	std::vector<float> modifiedData;
+	for(long i = 0; i < numSampsToProcess; i++){
+		modifiedData.push_back(newData[i]);
+	}
+	
+	// make sure to free allocated space!
+	SDL_free(cvt.buf);
+	//free(newData2);
+	
+	return modifiedData;
 }
 
 // convert data to 32-bit float karaoke audio for 1 channel 
@@ -264,6 +313,8 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 	wavSpec.callback = audioCallback;
 	wavSpec.freq = sampleRate; // user-specified sample rate 
 	
+	std::cout << "the sample rate is: " << sampleRate << std::endl;
+	
 	SDL_AudioDeviceID audioDevice;
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
 	
@@ -339,6 +390,61 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 	
 }
 
+// play pitch-shifted wav file 
+// don't need sampleRate arg? or at least make it a float
+void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
+	
+	// set up an AudioSpec to load in the file 
+	SDL_AudioSpec wavSpec;
+	Uint8* wavStart;
+	Uint32 wavLength;
+	
+	// load the wav file and some of its properties to the specified variables 
+	if(SDL_LoadWAV(file.c_str(), &wavSpec, &wavStart, &wavLength) == NULL){
+		std::cout << "couldn't load wav file" << std::endl;
+		return;
+	}
+	
+	std::cout << "inside playPitchShiftedAudio..." << std::endl;
+	
+	std::vector<float> audioData = pitchShift(wavStart, wavLength);
+	for(int i = 0; i < 10; i++){
+		std::cout << "audioData[" << i << "]" << ": " << audioData[i] << std::endl;
+	}
+	
+	AudioData audio;
+	audio.position = (Uint8*)audioData.data(); 
+	audio.length = (Uint32)(audioData.size() * sizeof(float));
+	
+	SDL_AudioSpec pitchShiftSpec;
+	pitchShiftSpec.userdata = &audio;
+	pitchShiftSpec.callback = audioCallback;
+	pitchShiftSpec.freq = DEF_SAMPLE_RATE;
+	pitchShiftSpec.format = AUDIO_F32;
+	pitchShiftSpec.channels = 2;
+	pitchShiftSpec.samples = wavSpec.samples;
+
+	SDL_AudioDeviceID audioDevice;
+	audioDevice = SDL_OpenAudioDevice(NULL, 0, &pitchShiftSpec, NULL, 0);
+	currentDeviceID = audioDevice;
+	
+	// play 
+	SDL_PauseAudioDevice(audioDevice, 0);
+	currentState = IS_PLAYING;
+	
+	while(audio.length > 0){
+		SDL_Delay(100); // set some delay so program doesn't immediately quit 
+	}
+	
+	// done playing audio. make sure to free stuff 
+	currentState = IS_STOPPED;
+	SDL_CloseAudioDevice(audioDevice);
+	SDL_FreeWAV(wavStart);
+	
+}
+
+
+
 // thread function to play audio 
 DWORD WINAPI playAudioProc(LPVOID lpParam){
 	
@@ -365,6 +471,22 @@ DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
 	int sampleRate = audioParams->sampleRate;
 	
 	playKaraokeAudio(filename, sampleRate);
+	
+	delete audioParams->filename;
+	delete audioParams;
+	
+	return 0;
+}
+
+// thread function to play pitch-shifted audio
+DWORD WINAPI playPitchShiftedAudioProc(LPVOID lpParam){
+
+	AudioParams* audioParams = (AudioParams*)lpParam;
+	
+	std::string filename = std::string((char*)(audioParams->filename));
+	int sampleRate = audioParams->sampleRate;
+	
+	playPitchShiftedAudio(filename, sampleRate);
 	
 	delete audioParams->filename;
 	delete audioParams;
@@ -484,6 +606,63 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 						}
 					}
 					break;
+				
+				case ID_PITCH_SHIFT:	
+				{
+					
+					
+					if(currentState == IS_STOPPED){
+							
+							// get the file first from the text area 
+							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+							int textLength = GetWindowTextLength(textbox);
+							
+							TCHAR* filename = new TCHAR[textLength + 1]();
+							
+							GetWindowText(textbox, filename, textLength + 1);
+							
+							// get the sample rate specified 
+							// set sample rate to default, which is 44100 if sample rate can't be extracted 
+							int sampleRate = 0;
+								
+							HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
+							int textLengthSample = GetWindowTextLength(sampleRateTextBox);
+								
+							TCHAR sampleRateText[textLengthSample+1];
+							GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
+								
+							// get the sample rate as a string
+							std::string sampleRateString = std::string((char*)sampleRateText);
+							//std::cout << sampleRateString << std::endl;
+							
+							// extract the int value from the string 
+							sampleRate = extractInt(sampleRateString);
+							
+							if(sampleRate == 0){
+								sampleRate = DEF_SAMPLE_RATE;
+							}
+						
+							// launch a thread to play the audio 
+							// pass the thread the params in the AudioParams struct  
+							char* fname = (char*)(filename);
+							
+							AudioParams* audioParams = new AudioParams();
+							audioParams->filename = fname;
+							audioParams->sampleRate = sampleRate;
+							
+							std::cout << "playing pitch-shifted audio..." << std::endl;
+							audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
+						}else if(currentState == IS_PAUSED){
+							// start up paused audio device again
+							std::cout << "starting where we left off..." << std::endl;
+							SDL_PauseAudioDevice(currentDeviceID, 0);
+							currentState = IS_PLAYING;
+						}
+					
+					
+				}
+				break;
+				
 				case ID_PAUSE_BUTTON:
 					// implement me 
 					{
@@ -657,6 +836,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	);
 	SendMessage(addSampleRateEdit, WM_SETFONT, (WPARAM)hFont, true);
 	
+	// pitch shift button 
+	HWND playPitchShift = CreateWindow(
+		TEXT("button"),
+		TEXT("play pitch shift"),
+		WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+		280, 80, 
+		100, 20, 
+		hwnd,
+		(HMENU)ID_PITCH_SHIFT,
+		hInstance,
+		NULL
+	);
+	SendMessage(playPitchShift, WM_SETFONT, (WPARAM)hFont, true);
 	
 	// make a button to play 
 	HWND playButton = CreateWindow(
