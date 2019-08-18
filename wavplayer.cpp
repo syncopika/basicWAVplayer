@@ -135,28 +135,26 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		len = audio->length;
 	}
 	
+	// preprocess audio data and then display chunks
+	
 	// divide width of sdl window by length (16384) 
 	// but each bar in the visual should be of some length :|
 	// so maybe instead take the avg of every n bytes?
 	// so num bars in window = (sample length / n)
 	// then bar width = window width / num bars
-	int numBars = len / VISUALIZER_WINDOW_WIDTH;
+	int numBars = len / (VISUALIZER_WINDOW_WIDTH*1.2);
 	//std::cout << "number of bars in visual: " << numBars << std::endl;
 	
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
+	
 	for(int i = 0; i < (int)len - numBars; i += numBars){
-		int barVal = (int)audio->position[i];
-		//std::cout << "barVal: " << barVal << std::endl;
-		//int barHeight = VISUALIZER_WINDOW_HEIGHT * ((int)barVal / VISUALIZER_WINDOW_HEIGHT)
-		SDL_RenderDrawLine(sdlRend, i, 0, i, barVal);
+		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i];
+		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT, i, barVal);
+		//SDL_RenderDrawPoint(sdlRend, i, barVal);
 		SDL_RenderPresent(sdlRend);
 	}
-	
-	// Or just stack the lines! if index exceeds the window width, start
-	// drawing at the beginning of the window again!
-	// https://wiki.libsdl.org/SDL_RenderDrawLine
 	
 	// copy len bytes from audio stream at audio->position to stream buffer
 	SDL_memcpy(streamF, audio->position, len);
@@ -761,8 +759,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	AllocConsole();
-    freopen( "CON", "w", stdout );
+	//AllocConsole();
+    //freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c

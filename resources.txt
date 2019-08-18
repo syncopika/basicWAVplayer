@@ -41,3 +41,9 @@
 // audio visualization?
 // https://2captiv8.blogspot.com/2016/06/howto-design-code-music-visualization-visualizer-audio-linux-c-sdl-fourier.html
 // https://www.perl.com/pub/2011/01/visualizing-music-with-sdl-and-perl.html/
+
+// good general audio info 
+// http://artsites.ucsc.edu/EMS/music/tech_background/TE-16/teces_16.html
+// http://digitalsoundandmusic.com/chapters/ch2/
+// https://stackoverflow.com/questions/25940376/whats-the-actual-data-in-a-wav-file
+// https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-sample-data
