@@ -10,7 +10,8 @@
 // https://opensource.apple.com/source/IOAudioFamily/IOAudioFamily-183.4.2/Examples/Templates/SamplePCIAudioDriver/SampleAudioClip.cpp.auto.html
 // https://stackoverflow.com/questions/15087668/how-to-convert-pcm-samples-in-byte-array-as-floating-point-numbers-in-the-range
 // https://stackoverflow.com/questions/46177712/convert-int16-array-to-float
-
+// https://gamedev.stackexchange.com/questions/75983/sdl2-window-as-child-of-win32-gui
+// https://gamedev.stackexchange.com/questions/110205/context-is-null-with-sdl-createwindowfrom-win32
 
 // wav file info 
 // http://www.cplusplus.com/forum/general/205408/
@@ -29,7 +30,6 @@
 // https://www.surina.net/soundtouch/
 // https://softwarerecs.stackexchange.com/questions/36289/c-c-library-for-changing-pitch-without-altering-formant-frequencies
 
-
 // with a gui, need to handle music stuff in another thread cause it'll block 
 // https://forums.libsdl.org/viewtopic.php?p=40771
 
@@ -37,3 +37,13 @@
 // https://stackoverflow.com/questions/4768294/multithreading-in-c
 // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createthread
 // https://msdn.microsoft.com/en-us/f0dc203f-200e-42f1-940c-24e3fe080175
+
+// audio visualization?
+// https://2captiv8.blogspot.com/2016/06/howto-design-code-music-visualization-visualizer-audio-linux-c-sdl-fourier.html
+// https://www.perl.com/pub/2011/01/visualizing-music-with-sdl-and-perl.html/
+
+// good general audio info 
+// http://artsites.ucsc.edu/EMS/music/tech_background/TE-16/teces_16.html
+// http://digitalsoundandmusic.com/chapters/ch2/
+// https://stackoverflow.com/questions/25940376/whats-the-actual-data-in-a-wav-file
+// https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-sample-data

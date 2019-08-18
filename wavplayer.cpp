@@ -8,6 +8,7 @@
 #include <SDL.h>
 #include <windows.h>
 #include <stdlib.h>
+#include <cstdio>
 
 // give some identifiers for the GUI components 
 #include "resources.h"
@@ -17,6 +18,11 @@
 
 // default sample rate 
 #define DEF_SAMPLE_RATE 44100
+
+#define GUI_WIDTH 600
+#define GUI_HEIGHT 450
+#define VISUALIZER_WINDOW_WIDTH 510
+#define VISUALIZER_WINDOW_HEIGHT 180
 
 
 /* features to add 
@@ -32,7 +38,7 @@ pretty helpful: https://github.com/syncopika/syncopika.github.io/blob/master/mis
 */
 
 // enum for current play state 
-enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED };
+enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED};
 
 // register window 
 const char g_szClassName[] = "mainGUI";
@@ -55,6 +61,10 @@ SDL_AudioDeviceID currentDeviceID;
 
 // keep track of thread designated to play audio. 
 HANDLE audioThread;
+
+// the sdl window and renderer for visualization 
+SDL_Window* sdlWnd;
+SDL_Renderer* sdlRend;
 
 // get the name of the file 
 std::string getFilename(std::string file){
@@ -107,7 +117,7 @@ struct AudioParams{
 	int sampleRate;
 };
 
-// define an audio callback that SDL_AudioSpec will use 
+// define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
 	
 	AudioData* audio = (AudioData*)userData;
@@ -123,6 +133,27 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	
 	if(len > audio->length){
 		len = audio->length;
+	}
+	
+	// preprocess audio data and then display chunks
+	
+	// divide width of sdl window by length (16384) 
+	// but each bar in the visual should be of some length :|
+	// so maybe instead take the avg of every n bytes?
+	// so num bars in window = (sample length / n)
+	// then bar width = window width / num bars
+	int numBars = len / (VISUALIZER_WINDOW_WIDTH*1.2);
+	//std::cout << "number of bars in visual: " << numBars << std::endl;
+	
+	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+	SDL_RenderClear(sdlRend);
+	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
+	
+	for(int i = 0; i < (int)len - numBars; i += numBars){
+		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i];
+		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT, i, barVal);
+		//SDL_RenderDrawPoint(sdlRend, i, barVal);
+		SDL_RenderPresent(sdlRend);
 	}
 	
 	// copy len bytes from audio stream at audio->position to stream buffer
@@ -249,7 +280,6 @@ void saveKaraokeWAV(const char* filename){
 	stream.open(file.c_str(), std::ios::binary); 
 	
 	int32_t bufferSize = (int32_t)audioData.size();
-	
 	int32_t riffChunkSize = 36 + bufferSize * 2;
 	int32_t formatSize = 16;
 	int16_t pcm = 1;
@@ -293,6 +323,8 @@ void saveKaraokeWAV(const char* filename){
 void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
 	
 	std::cout << "playing: " << file << std::endl; 
+	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+	SDL_RenderClear(sdlRend);
 	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
@@ -344,6 +376,8 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 // play wav file with vocal removal 
 // assumes SDL is initialized!
 void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\route216.wav", int sampleRate = DEF_SAMPLE_RATE){
+	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+	SDL_RenderClear(sdlRend);
 	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
@@ -609,8 +643,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 				
 				case ID_PITCH_SHIFT:	
 				{
-					
-					
 					if(currentState == IS_STOPPED){
 							
 							// get the file first from the text area 
@@ -658,8 +690,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 							SDL_PauseAudioDevice(currentDeviceID, 0);
 							currentState = IS_PLAYING;
 						}
-					
-					
 				}
 				break;
 				
@@ -677,6 +707,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 					break;
 				case ID_STOP_BUTTON:
 					{
+						SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+						SDL_RenderClear(sdlRend);
 						std::cout << "the current state is: " << currentState << std::endl;
 						if(currentState != IS_STOPPED){
 							currentState = IS_STOPPED;
@@ -727,8 +759,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	AllocConsole();
-    freopen( "CON", "w", stdout );
+	//AllocConsole();
+    //freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
@@ -772,7 +804,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		g_szClassName,
 		"basic WAV player",
 		WS_TILEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, 600, 250,
+		CW_USEDEFAULT, CW_USEDEFAULT, GUI_WIDTH, GUI_HEIGHT,
 		NULL, NULL, hInstance, NULL
 	);
 	
@@ -920,10 +952,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	);
 	SendMessage(saveKaraokeButton, WM_SETFONT, (WPARAM)hFont, true);
 	
+	// child window to visualize audio (wow!)
+	HWND audioVisualizerWindow = CreateWindow(
+		TEXT("STATIC"),
+		NULL,
+		WS_CHILD | WS_VISIBLE | WS_BORDER,
+        30, 200,
+        VISUALIZER_WINDOW_WIDTH, VISUALIZER_WINDOW_HEIGHT, 
+        hwnd,
+        (HMENU)ID_AUDIO_VISUALIZER,
+        hInstance,
+        NULL
+	);
+	SendMessage(audioVisualizerWindow, WM_SETFONT, (WPARAM)hFont, true);
 	
 	// display the gui 
 	ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
+	
+	// make the audio visualizer child window an SDL window!
+	SDL_InitSubSystem(SDL_INIT_VIDEO);
+	
+	sdlWnd = SDL_CreateWindowFrom(audioVisualizerWindow);
+	sdlRend = SDL_CreateRenderer(sdlWnd, -1, SDL_RENDERER_ACCELERATED);
+	
+	char sBuf[32];
+	sprintf(sBuf, "%p", sdlWnd);
+	SDL_SetHint(SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT, sBuf);
+
+	//SDL_SetWindowTitle(sdlWnd, "SDL Window - Set by SDL");
+	//SDL_Surface* s = SDL_GetWindowSurface(sdlWnd);
+	//SDL_FillRect(s, &s->clip_rect, 0xffff00ff);
+	//SDL_UpdateWindowSurface(sdlWnd);
     
     // message loop
     while(GetMessage(&Msg, NULL, 0, 0) > 0){

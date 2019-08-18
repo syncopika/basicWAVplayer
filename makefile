@@ -3,8 +3,8 @@
 # specify compiler
 CXX = g++ 
 
-SDL_LIB = -LC:\libs\SDL2-2.0.9\i686-w64-mingw32\lib -lSDL2main -lSDL2
-SDL_INCLUDE = -IC:\libs\SDL2-2.0.9\i686-w64-mingw32\include\SDL2
+SDL_LIB = -LC:\libraries\SDL2-2.0.10\i686-w64-mingw32\lib -lSDL2main -lSDL2
+SDL_INCLUDE = -IC:\libraries\SDL2-2.0.10\i686-w64-mingw32\include\SDL2
 
 # set up flags 
 CFLAGS = -Wall -c -std=c++14 $(SDL_INCLUDE)
