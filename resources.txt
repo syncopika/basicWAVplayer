@@ -50,3 +50,4 @@ https://stackoverflow.com/questions/26663494/algorithm-to-draw-waveform-from-aud
 // https://stackoverflow.com/questions/25940376/whats-the-actual-data-in-a-wav-file
 // https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-sample-data
 https://subscription.packtpub.com/book/game_development/9781849699099/1/ch01lvl1sec09/analog-and-digital-audio
+https://gist.github.com/endolith/e8597a58bcd11a6462f33fa8eb75c43d

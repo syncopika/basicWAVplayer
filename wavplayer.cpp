@@ -117,6 +117,10 @@ struct AudioParams{
 	int sampleRate;
 };
 
+int interpolateLength(float newX, float x1, float y1, float x2, float y2){
+	return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
+}
+
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
 	
@@ -148,17 +152,22 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
 	
 	for(int i = 0; i <= (int)len - numBars; i += numBars){
-		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i]/2;
+		int rawVal = (int)audio->position[i];
+		bool isNegative = rawVal < 127;
 		
-		std::cout << "audio->position[i]: " << (int)audio->position[i] << std::endl;
+		int lineStart = 0;
+		int lineStop = 0;
+		int scaledVal = interpolateLength((float)rawVal, 0.0, 0.0, 255.0, (float)VISUALIZER_WINDOW_HEIGHT/2); // 255 because range of vals is 0-255 because uint8. height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
 		
-		// center the lines
-		int barOffset = 0;
-		if(barVal < VISUALIZER_WINDOW_HEIGHT){
-			barOffset = (int)((VISUALIZER_WINDOW_HEIGHT - barVal)/2);
+		if(isNegative){
+			lineStart = (VISUALIZER_WINDOW_HEIGHT/2)-scaledVal;
+			lineStop = VISUALIZER_WINDOW_HEIGHT/2;
+		}else{
+			lineStart = VISUALIZER_WINDOW_HEIGHT/2;
+			lineStop = (VISUALIZER_WINDOW_HEIGHT/2)+scaledVal;
 		}
 		
-		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT-barOffset, i, VISUALIZER_WINDOW_HEIGHT-barOffset-barVal);
+		SDL_RenderDrawLine(sdlRend, i, lineStart, i, lineStop); // sdl rect left corner is 0,0
 		SDL_RenderPresent(sdlRend);
 	}
 	
@@ -480,7 +489,6 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
-	
 }
 
 
@@ -765,8 +773,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	AllocConsole();
-    freopen( "CON", "w", stdout );
+	//AllocConsole();
+    //freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
