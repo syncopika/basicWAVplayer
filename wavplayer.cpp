@@ -135,24 +135,30 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		len = audio->length;
 	}
 	
-	// preprocess audio data and then display chunks
-	
 	// divide width of sdl window by length (16384) 
 	// but each bar in the visual should be of some length :|
 	// so maybe instead take the avg of every n bytes?
 	// so num bars in window = (sample length / n)
 	// then bar width = window width / num bars
-	int numBars = len / (VISUALIZER_WINDOW_WIDTH*1.2);
+	int numBars = len / VISUALIZER_WINDOW_WIDTH;
 	//std::cout << "number of bars in visual: " << numBars << std::endl;
 	
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
 	
-	for(int i = 0; i < (int)len - numBars; i += numBars){
-		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i];
-		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT, i, barVal);
-		//SDL_RenderDrawPoint(sdlRend, i, barVal);
+	for(int i = 0; i <= (int)len - numBars; i += numBars){
+		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i]/2;
+		
+		std::cout << "audio->position[i]: " << (int)audio->position[i] << std::endl;
+		
+		// center the lines
+		int barOffset = 0;
+		if(barVal < VISUALIZER_WINDOW_HEIGHT){
+			barOffset = (int)((VISUALIZER_WINDOW_HEIGHT - barVal)/2);
+		}
+		
+		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT-barOffset, i, VISUALIZER_WINDOW_HEIGHT-barOffset-barVal);
 		SDL_RenderPresent(sdlRend);
 	}
 	
@@ -320,7 +326,7 @@ void saveKaraokeWAV(const char* filename){
 
 
 // play wav file regularly 
-void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	
 	std::cout << "playing: " << file << std::endl; 
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
@@ -375,7 +381,7 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 
 // play wav file with vocal removal 
 // assumes SDL is initialized!
-void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\route216.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	
@@ -426,7 +432,7 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 
 // play pitch-shifted wav file 
 // don't need sampleRate arg? or at least make it a float
-void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
@@ -439,7 +445,7 @@ void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop
 		return;
 	}
 	
-	std::cout << "inside playPitchShiftedAudio..." << std::endl;
+	//std::cout << "inside playPitchShiftedAudio..." << std::endl;
 	
 	std::vector<float> audioData = pitchShift(wavStart, wavLength);
 	for(int i = 0; i < 10; i++){
@@ -759,8 +765,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	//AllocConsole();
-    //freopen( "CON", "w", stdout );
+	AllocConsole();
+    freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
