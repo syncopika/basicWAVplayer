@@ -139,11 +139,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		len = audio->length;
 	}
 	
-	// divide width of sdl window by length (16384) 
-	// but each bar in the visual should be of some length :|
-	// so maybe instead take the avg of every n bytes?
-	// so num bars in window = (sample length / n)
-	// then bar width = window width / num bars
+	// number of data points to show at a time on the screen
 	int numBars = len / VISUALIZER_WINDOW_WIDTH;
 	//std::cout << "number of bars in visual: " << numBars << std::endl;
 	
@@ -151,25 +147,41 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	SDL_RenderClear(sdlRend);
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
 	
+	int lastPointY = 0;
+	int lastPointX = 0;
+	
 	for(int i = 0; i <= (int)len - numBars; i += numBars){
-		int rawVal = (int)audio->position[i];
-		bool isNegative = rawVal < 127;
+		// TODO: not really sure I'm interpreting the audio data correctly. wav file audio data is also 16-bit so...
+		// let's assume stereo? do i%2 to check if L or R channel. let's take avg of L and R
+		bool isLeftChan = (i%2 == 0);
+		int avgSignalAmp = 0;
+		if(isLeftChan){
+			//int rawVal = (int)audio->position[i]; // are we sure this is correct? (i.e. is it really a signal amplitude)
+			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i+1])/2;
+		}else{
+			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i-1])/2;
+		}
+		
+		bool isNegative = avgSignalAmp < 127;
 		
 		int lineStart = 0;
 		int lineStop = 0;
-		int scaledVal = interpolateLength((float)rawVal, 0.0, 0.0, 255.0, (float)VISUALIZER_WINDOW_HEIGHT/2); // 255 because range of vals is 0-255 because uint8. height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
+		int scaledVal = interpolateLength((float)avgSignalAmp, 0.0, 0.0, 255.0, (float)VISUALIZER_WINDOW_HEIGHT/2); // 255 because range of vals is 0-255 because uint8. height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
 		
 		if(isNegative){
 			lineStart = (VISUALIZER_WINDOW_HEIGHT/2)-scaledVal;
 			lineStop = VISUALIZER_WINDOW_HEIGHT/2;
+			SDL_RenderDrawLine(sdlRend, lastPointX, (i == 0 ? lineStart : lastPointY), i, lineStart); // sdl rect left corner is 0,0
+			lastPointY = lineStart;
 		}else{
 			lineStart = VISUALIZER_WINDOW_HEIGHT/2;
 			lineStop = (VISUALIZER_WINDOW_HEIGHT/2)+scaledVal;
+			SDL_RenderDrawLine(sdlRend, lastPointX, (i == 0 ? lineStop : lastPointY), i, lineStop);
+			lastPointY = lineStop;
 		}
-		
-		SDL_RenderDrawLine(sdlRend, i, lineStart, i, lineStop); // sdl rect left corner is 0,0
-		SDL_RenderPresent(sdlRend);
+		lastPointX = i;
 	}
+	SDL_RenderPresent(sdlRend);
 	
 	// copy len bytes from audio stream at audio->position to stream buffer
 	SDL_memcpy(streamF, audio->position, len);
