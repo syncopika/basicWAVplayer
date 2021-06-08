@@ -121,6 +121,18 @@ int interpolateLength(float newX, float x1, float y1, float x2, float y2){
 	return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
 }
 
+// get a vector of the evenly-distributed indices to sample from the dataset based on num samples desired
+// https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
+std::vector<int> getSampleIndices(int dataLen, int numSamples){
+	std::vector<int> result;
+	int samples = (numSamples <= dataLen) ? numSamples : dataLen; 
+	for(int i = 0; i < samples; i++){
+		int idx = std::floor((i*dataLen)/samples) + std::floor(dataLen/(2*samples));
+		result.push_back(idx);
+	}
+	return result;
+}
+
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
 	
@@ -140,8 +152,8 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	}
 	
 	// number of data points to show at a time on the screen
-	int numBars = len / VISUALIZER_WINDOW_WIDTH;
-	//std::cout << "number of bars in visual: " << numBars << std::endl;
+	int desiredNumPointsToDisplay = VISUALIZER_WINDOW_WIDTH / 10; // show an audio data point every 10 pixels on the canvas
+	std::vector<int> sampleIndices = getSampleIndices((int)len-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available
 	
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
@@ -149,24 +161,35 @@ void audioCallback(void* userData, Uint8* stream, int length){
 	
 	int lastPointY = 0;
 	int lastPointX = 0;
+	float audioDataSize = 65536; //255.0; // if 8-bit data, 255. if 16-bit, 65536. etc.
 	
-	for(int i = 0; i <= (int)len - numBars; i += numBars){
-		// TODO: not really sure I'm interpreting the audio data correctly. wav file audio data is also 16-bit so...
-		// let's assume stereo? do i%2 to check if L or R channel. let's take avg of L and R
-		bool isLeftChan = (i%2 == 0);
+	for(int i = 0; i < (int)sampleIndices.size(); i++){
+		int sampleIdx = sampleIndices[i];
+		
+		// b/c we want 16-bit int and not 8-bit
+		if(sampleIdx % 2 != 0){
+			sampleIdx--;
+		}
+		
+		int avgSignalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]); // rename var later
+		
+		/* assuming 16-bit audio data here!!
+		// let's assume stereo also? do i%2 to check if L or R channel. let's take avg of L and R
+		bool isLeftChan = (sampleIdx%2 == 0);
 		int avgSignalAmp = 0;
+		
 		if(isLeftChan){
 			//int rawVal = (int)audio->position[i]; // are we sure this is correct? (i.e. is it really a signal amplitude)
 			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i+1])/2;
 		}else{
 			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i-1])/2;
-		}
+		}*/
 		
-		bool isNegative = avgSignalAmp < 127;
+		bool isNegative = avgSignalAmp < (int)(audioDataSize/2);
 		
 		int lineStart = 0;
 		int lineStop = 0;
-		int scaledVal = interpolateLength((float)avgSignalAmp, 0.0, 0.0, 255.0, (float)VISUALIZER_WINDOW_HEIGHT/2); // 255 because range of vals is 0-255 because uint8. height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
+		int scaledVal = interpolateLength((float)avgSignalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
 		
 		if(isNegative){
 			lineStart = (VISUALIZER_WINDOW_HEIGHT/2)-scaledVal;

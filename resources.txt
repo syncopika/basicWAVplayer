@@ -43,6 +43,8 @@
 // https://www.perl.com/pub/2011/01/visualizing-music-with-sdl-and-perl.html/
 https://stackoverflow.com/questions/2066090/plotting-waveform-of-the-wav-file
 https://stackoverflow.com/questions/26663494/algorithm-to-draw-waveform-from-audio
+https://stackoverflow.com/questions/18771375/c-reading-16bit-wav-file
+https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
 
 // good general audio info 
 // http://artsites.ucsc.edu/EMS/music/tech_background/TE-16/teces_16.html
