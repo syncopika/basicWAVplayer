@@ -117,6 +117,22 @@ struct AudioParams{
 	int sampleRate;
 };
 
+int interpolateLength(float newX, float x1, float y1, float x2, float y2){
+	return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
+}
+
+// get a vector of the evenly-distributed indices to sample from the dataset based on num samples desired
+// https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
+std::vector<int> getSampleIndices(int dataLen, int numSamples){
+	std::vector<int> result;
+	int samples = (numSamples <= dataLen) ? numSamples : dataLen; 
+	for(int i = 0; i < samples; i++){
+		int idx = std::floor((i*dataLen)/samples) + std::floor(dataLen/(2*samples));
+		result.push_back(idx);
+	}
+	return result;
+}
+
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
 	
@@ -135,26 +151,44 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		len = audio->length;
 	}
 	
-	// preprocess audio data and then display chunks
-	
-	// divide width of sdl window by length (16384) 
-	// but each bar in the visual should be of some length :|
-	// so maybe instead take the avg of every n bytes?
-	// so num bars in window = (sample length / n)
-	// then bar width = window width / num bars
-	int numBars = len / (VISUALIZER_WINDOW_WIDTH*1.2);
-	//std::cout << "number of bars in visual: " << numBars << std::endl;
+	int desiredNumPointsToDisplay = 1000; // number of data points to show at a time on the screen
+	std::vector<int> sampleIndices = getSampleIndices((int)len-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
 	
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
 	
-	for(int i = 0; i < (int)len - numBars; i += numBars){
-		int barVal = ((int)audio->position[i] == 0) ? VISUALIZER_WINDOW_HEIGHT : (int)audio->position[i];
-		SDL_RenderDrawLine(sdlRend, i, VISUALIZER_WINDOW_HEIGHT, i, barVal);
-		//SDL_RenderDrawPoint(sdlRend, i, barVal);
-		SDL_RenderPresent(sdlRend);
+	float audioDataSize = 65536; //255.0; // if 8-bit data, 255. if 16-bit, 65536. etc.
+	
+	for(int i = 0; i < (int)sampleIndices.size(); i++){
+		int sampleIdx = sampleIndices[i];
+
+		// b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
+		int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+		
+		/* assuming 16-bit audio data here!!
+		// let's assume stereo also? do i%2 to check if L or R channel. let's take avg of L and R
+		bool isLeftChan = (sampleIdx%2 == 0);
+		int avgSignalAmp = 0;
+		
+		if(isLeftChan){
+			//int rawVal = (int)audio->position[i]; // are we sure this is correct? (i.e. is it really a signal amplitude)
+			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i+1])/2;
+		}else{
+			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i-1])/2;
+		}*/
+		
+		int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
+		
+		if(scaledVal >= 70){
+			scaledVal = 0;
+		}
+		
+		int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
+		
+		SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
 	}
+	SDL_RenderPresent(sdlRend);
 	
 	// copy len bytes from audio stream at audio->position to stream buffer
 	SDL_memcpy(streamF, audio->position, len);
@@ -320,7 +354,7 @@ void saveKaraokeWAV(const char* filename){
 
 
 // play wav file regularly 
-void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	
 	std::cout << "playing: " << file << std::endl; 
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
@@ -375,7 +409,7 @@ void playWavAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休�
 
 // play wav file with vocal removal 
 // assumes SDL is initialized!
-void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\route216.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	
@@ -426,7 +460,7 @@ void playKaraokeAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\rou
 
 // play pitch-shifted wav file 
 // don't need sampleRate arg? or at least make it a float
-void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop\\昼休みとヘルメットと同級生.wav", int sampleRate = DEF_SAMPLE_RATE){
+void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
@@ -439,7 +473,7 @@ void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop
 		return;
 	}
 	
-	std::cout << "inside playPitchShiftedAudio..." << std::endl;
+	//std::cout << "inside playPitchShiftedAudio..." << std::endl;
 	
 	std::vector<float> audioData = pitchShift(wavStart, wavLength);
 	for(int i = 0; i < 10; i++){
@@ -474,7 +508,6 @@ void playPitchShiftedAudio(std::string file = "C:\\Users\\Nicholas Hung\\Desktop
 	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
-	
 }
 
 

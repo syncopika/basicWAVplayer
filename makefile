@@ -3,7 +3,10 @@
 # specify compiler
 CXX = g++ 
 
+# -LC:\SDL2\lib -lSDL2main -lSDL2
 SDL_LIB = -LC:\libraries\SDL2-2.0.10\i686-w64-mingw32\lib -lSDL2main -lSDL2
+
+# -IC:\SDL2\include\SDL2
 SDL_INCLUDE = -IC:\libraries\SDL2-2.0.10\i686-w64-mingw32\include\SDL2
 
 # set up flags 
