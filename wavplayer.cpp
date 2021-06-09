@@ -151,27 +151,20 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		len = audio->length;
 	}
 	
-	// number of data points to show at a time on the screen
-	int desiredNumPointsToDisplay = VISUALIZER_WINDOW_WIDTH / 10; // show an audio data point every 10 pixels on the canvas
-	std::vector<int> sampleIndices = getSampleIndices((int)len-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available
+	int desiredNumPointsToDisplay = 1000; // number of data points to show at a time on the screen
+	std::vector<int> sampleIndices = getSampleIndices((int)len-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
 	
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
 	SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
 	
-	int lastPointY = 0;
-	int lastPointX = 0;
 	float audioDataSize = 65536; //255.0; // if 8-bit data, 255. if 16-bit, 65536. etc.
 	
 	for(int i = 0; i < (int)sampleIndices.size(); i++){
 		int sampleIdx = sampleIndices[i];
-		
-		// b/c we want 16-bit int and not 8-bit
-		if(sampleIdx % 2 != 0){
-			sampleIdx--;
-		}
-		
-		int avgSignalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]); // rename var later
+
+		// b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
+		int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
 		
 		/* assuming 16-bit audio data here!!
 		// let's assume stereo also? do i%2 to check if L or R channel. let's take avg of L and R
@@ -185,24 +178,15 @@ void audioCallback(void* userData, Uint8* stream, int length){
 			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i-1])/2;
 		}*/
 		
-		bool isNegative = avgSignalAmp < (int)(audioDataSize/2);
+		int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
 		
-		int lineStart = 0;
-		int lineStop = 0;
-		int scaledVal = interpolateLength((float)avgSignalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
-		
-		if(isNegative){
-			lineStart = (VISUALIZER_WINDOW_HEIGHT/2)-scaledVal;
-			lineStop = VISUALIZER_WINDOW_HEIGHT/2;
-			SDL_RenderDrawLine(sdlRend, lastPointX, (i == 0 ? lineStart : lastPointY), i, lineStart); // sdl rect left corner is 0,0
-			lastPointY = lineStart;
-		}else{
-			lineStart = VISUALIZER_WINDOW_HEIGHT/2;
-			lineStop = (VISUALIZER_WINDOW_HEIGHT/2)+scaledVal;
-			SDL_RenderDrawLine(sdlRend, lastPointX, (i == 0 ? lineStop : lastPointY), i, lineStop);
-			lastPointY = lineStop;
+		if(scaledVal >= 70){
+			scaledVal = 0;
 		}
-		lastPointX = i;
+		
+		int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
+		
+		SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
 	}
 	SDL_RenderPresent(sdlRend);
 	
