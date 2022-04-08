@@ -10,11 +10,14 @@
 #include <stdlib.h>
 #include <cstdio>
 
+// SoundTouch code by Olli Parviainen
+#include "soundtouch/SoundTouch.h"
+
 // give some identifiers for the GUI components 
 #include "resources.h"
 
 // pitch shifting code by Stephan Bernsee 
-#include "smbPitchShift.h"
+//#include "smbPitchShift.h"
 
 // default sample rate 
 #define DEF_SAMPLE_RATE 44100
@@ -27,11 +30,7 @@
 
 /* features to add 
 
-pretty helpful: https://github.com/syncopika/syncopika.github.io/blob/master/misc/karaokeget.html
-
-- gui
 - timestamp? marker to show how many seconds has elapsed, total time to play 
-- play/pause
 - change pitch
 - turn karaoke off or on 
 
@@ -68,7 +67,6 @@ SDL_Renderer* sdlRend;
 
 // get the name of the file 
 std::string getFilename(std::string file){
-	
 	// find the last instance of a slash, if any 
 	// if there isn't any, then just return file
 	size_t lastSlashIndex = 0;
@@ -135,7 +133,6 @@ std::vector<int> getSampleIndices(int dataLen, int numSamples){
 
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
-	
 	AudioData* audio = (AudioData*)userData;
 	float* streamF = (float *)stream;
 	
@@ -203,7 +200,6 @@ void audioCallback(void* userData, Uint8* stream, int length){
 // it works, but IS SLOWWWWW! just don't think it's broken...
 // use gdb to run it and check
 std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
-	
 	// convert audio data to F32 
 	SDL_AudioCVT cvt;
 	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 1, DEF_SAMPLE_RATE, AUDIO_F32, 1, DEF_SAMPLE_RATE);
@@ -227,7 +223,7 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
 	long osamp = 32;
 
 	// do the pitch shift up
-	smbPitchShift(1.5, numSampsToProcess, fftFrameSize, osamp, sampleRate, newData, newData);
+	//smbPitchShift(1.5, numSampsToProcess, fftFrameSize, osamp, sampleRate, newData, newData);
 	
 	// output
 	std::vector<float> modifiedData;
@@ -245,7 +241,6 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
 // convert data to 32-bit float karaoke audio for 1 channel 
 // need to pass it the data and the length of the data 
 std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength){
-	
 	// convert audio data to F32 
 	SDL_AudioCVT cvt;
 	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
@@ -290,7 +285,6 @@ std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength){
 
 // save file as wav 
 void saveKaraokeWAV(const char* filename){
-	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
 	Uint8* wavStart;
@@ -355,7 +349,6 @@ void saveKaraokeWAV(const char* filename){
 
 // play wav file regularly 
 void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
-	
 	std::cout << "playing: " << file << std::endl; 
 	SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(sdlRend);
@@ -404,7 +397,6 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
-	
 }
 
 // play wav file with vocal removal 
@@ -455,13 +447,11 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	currentState = IS_STOPPED;
 	SDL_CloseAudioDevice(audioDevice);
 	SDL_FreeWAV(wavStart);
-	
 }
 
 // play pitch-shifted wav file 
 // don't need sampleRate arg? or at least make it a float
 void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
-	
 	// set up an AudioSpec to load in the file 
 	SDL_AudioSpec wavSpec;
 	Uint8* wavStart;
@@ -474,7 +464,11 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 	}
 	
 	//std::cout << "inside playPitchShiftedAudio..." << std::endl;
+    // see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp
+    soundtouch::SoundTouch soundTouch;
+    soundTouch.setPitchSemiTones(2); // raise pitch by 2 semitones
 	
+    // TODO: pass soundtouch to pitchShift and do the thing
 	std::vector<float> audioData = pitchShift(wavStart, wavLength);
 	for(int i = 0; i < 10; i++){
 		std::cout << "audioData[" << i << "]" << ": " << audioData[i] << std::endl;
@@ -514,7 +508,6 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 
 // thread function to play audio 
 DWORD WINAPI playAudioProc(LPVOID lpParam){
-	
 	AudioParams* audioParams = (AudioParams*)lpParam;
 	
 	std::string filename = std::string((char*)(audioParams->filename));
@@ -531,7 +524,6 @@ DWORD WINAPI playAudioProc(LPVOID lpParam){
 
 // thread function to play karaoke audio 
 DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
-
 	AudioParams* audioParams = (AudioParams*)lpParam;
 	
 	std::string filename = std::string((char*)(audioParams->filename));
@@ -547,7 +539,6 @@ DWORD WINAPI playKaraokeAudioProc(LPVOID lpParam){
 
 // thread function to play pitch-shifted audio
 DWORD WINAPI playPitchShiftedAudioProc(LPVOID lpParam){
-
 	AudioParams* audioParams = (AudioParams*)lpParam;
 	
 	std::string filename = std::string((char*)(audioParams->filename));
@@ -570,18 +561,15 @@ DWORD WINAPI saveKaraokeAudio(LPVOID lpParam){
 
 // procedure for main window 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-    
     switch(msg){
 		case WM_COMMAND:
 			/* LOWORD takes the lower 16 bits of wParam => the element clicked on */
 			switch(LOWORD(wParam)){
-				
 				case ID_PLAY_BUTTON:
 					{
 						std::cout << "the current state is: " << currentState << std::endl;
 						// play regular audio 
 						if(currentState == IS_STOPPED){
-							
 							// get the file first from the text area 
 							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
 							int textLength = GetWindowTextLength(textbox);
@@ -632,7 +620,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 				case ID_PLAY_KARAOKE_BUTTON:
 					{
 						if(currentState == IS_STOPPED){
-							
 							// get the file first from the text area 
 							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
 							int textLength = GetWindowTextLength(textbox);
@@ -677,7 +664,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 				case ID_PITCH_SHIFT:	
 				{
 					if(currentState == IS_STOPPED){
-							
 							// get the file first from the text area 
 							HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
 							int textLength = GetWindowTextLength(textbox);
@@ -730,7 +716,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 					// implement me 
 					{
 						if(currentState == IS_PLAYING){
-							
 							currentState = IS_PAUSED;
 						
 							// halt the audio device callback function 

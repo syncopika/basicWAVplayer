@@ -207,6 +207,7 @@ public:
 		return sampleReq;
 	}
 };
+/* edit by syncopika: I don't think we need MMX/SSE stuff so commenting out...
 // Implementation-specific class declarations:
 #ifdef SOUNDTOUCH_ALLOW_MMX
     /// Class that implements MMX optimized routines for 16bit integer samples type.
@@ -228,5 +229,6 @@ public:
         double calcCrossCorrAccumulate(const float *mixingPos, const float *compare, double &norm) override;
     };
 #endif /// SOUNDTOUCH_ALLOW_SSE
+*/
 }
 #endif  /// TDStretch_H
