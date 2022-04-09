@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <cstdio>
+#include <stdexcept>
 
 // SoundTouch code by Olli Parviainen
 #include "soundtouch/SoundTouch.h"
@@ -163,18 +164,6 @@ void audioCallback(void* userData, Uint8* stream, int length){
 		// b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
 		int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
 		
-		/* assuming 16-bit audio data here!!
-		// let's assume stereo also? do i%2 to check if L or R channel. let's take avg of L and R
-		bool isLeftChan = (sampleIdx%2 == 0);
-		int avgSignalAmp = 0;
-		
-		if(isLeftChan){
-			//int rawVal = (int)audio->position[i]; // are we sure this is correct? (i.e. is it really a signal amplitude)
-			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i+1])/2;
-		}else{
-			avgSignalAmp = ((int)audio->position[i] + (int)audio->position[i-1])/2;
-		}*/
-		
 		int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
 		
 		if(scaledVal >= 70){
@@ -199,7 +188,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
 // https://www.kvraudio.com/forum/viewtopic.php?t=349092
 // it works, but IS SLOWWWWW! just don't think it's broken...
 // use gdb to run it and check
-std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
+std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::SoundTouch& soundTouch){
 	// convert audio data to F32 
 	SDL_AudioCVT cvt;
 	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 1, DEF_SAMPLE_RATE, AUDIO_F32, 1, DEF_SAMPLE_RATE);
@@ -212,28 +201,29 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength){
 	
 	// audio data is now in float form!
 	float* newData = (float*)cvt.buf;
-	//float* newData2 = (float*)malloc((int)cvt.len_cvt);
 	
 	int floatBufLen = (int)cvt.len_cvt / 4;
-	std::cout << (int)cvt.len_cvt << std::endl;
 	
-	long numSampsToProcess = (long)floatBufLen;
-	float sampleRate = (float)DEF_SAMPLE_RATE;
-	long fftFrameSize = 1024;
-	long osamp = 32;
-
-	// do the pitch shift up
-	//smbPitchShift(1.5, numSampsToProcess, fftFrameSize, osamp, sampleRate, newData, newData);
-	
-	// output
-	std::vector<float> modifiedData;
-	for(long i = 0; i < numSampsToProcess; i++){
-		modifiedData.push_back(newData[i]);
-	}
+	uint numSamplesToProcess = (uint)floatBufLen;
+    
+    std::vector<float> modifiedData;
+    try{
+        // https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp#L191
+        soundTouch.putSamples(newData, numSamplesToProcess);
+        
+        do{
+          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen);
+          for(uint i = 0; i < numSamplesToProcess; i++){
+            modifiedData.push_back(newData[i]);
+          }
+        }while(numSamplesToProcess != 0);
+        
+    }catch(const std::runtime_error &e){
+        printf("%s\n", e.what());
+    }
 	
 	// make sure to free allocated space!
 	SDL_free(cvt.buf);
-	//free(newData2);
 	
 	return modifiedData;
 }
@@ -390,7 +380,7 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	currentState = IS_PLAYING;
 	
 	while(audio.length > 0){
-		SDL_Delay(100); // set some delay so program doesn't immediately quit 
+		SDL_Delay(30); // set some delay so program doesn't immediately quit 
 	}
 	
 	// done playing audio. make sure to free stuff. 
@@ -440,7 +430,7 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	currentState = IS_PLAYING;
 	
 	while(audio.length > 0){
-		SDL_Delay(100); // set some delay so program doesn't immediately quit 
+		SDL_Delay(30); // set some delay so program doesn't immediately quit 
 	}
 	
 	// done playing audio. make sure to free stuff 
@@ -463,16 +453,14 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 		return;
 	}
 	
-	//std::cout << "inside playPitchShiftedAudio..." << std::endl;
     // see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp
     soundtouch::SoundTouch soundTouch;
-    soundTouch.setPitchSemiTones(2); // raise pitch by 2 semitones
+    soundTouch.setSampleRate(sampleRate);
+    soundTouch.setChannels(2);
+    soundTouch.setPitchSemiTones(2); // raise pitch by 2 semitones TODO: make this something a user can change
 	
-    // TODO: pass soundtouch to pitchShift and do the thing
-	std::vector<float> audioData = pitchShift(wavStart, wavLength);
-	for(int i = 0; i < 10; i++){
-		std::cout << "audioData[" << i << "]" << ": " << audioData[i] << std::endl;
-	}
+    // pass soundtouch to pitchShift and do the thing
+	std::vector<float> audioData = pitchShift(wavStart, wavLength, soundTouch);
 	
 	AudioData audio;
 	audio.position = (Uint8*)audioData.data(); 
@@ -481,7 +469,7 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 	SDL_AudioSpec pitchShiftSpec;
 	pitchShiftSpec.userdata = &audio;
 	pitchShiftSpec.callback = audioCallback;
-	pitchShiftSpec.freq = DEF_SAMPLE_RATE;
+	pitchShiftSpec.freq = sampleRate;
 	pitchShiftSpec.format = AUDIO_F32;
 	pitchShiftSpec.channels = 2;
 	pitchShiftSpec.samples = wavSpec.samples;
@@ -495,7 +483,7 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 	currentState = IS_PLAYING;
 	
 	while(audio.length > 0){
-		SDL_Delay(100); // set some delay so program doesn't immediately quit 
+		SDL_Delay(30); // set some delay so program doesn't immediately quit 
 	}
 	
 	// done playing audio. make sure to free stuff 
@@ -545,6 +533,8 @@ DWORD WINAPI playPitchShiftedAudioProc(LPVOID lpParam){
 	int sampleRate = audioParams->sampleRate;
 	
 	playPitchShiftedAudio(filename, sampleRate);
+    
+    std::cout << "donep playing pitch-shifted audio\n";
 	
 	delete audioParams->filename;
 	delete audioParams;
@@ -725,10 +715,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 					break;
 				case ID_STOP_BUTTON:
 					{
-						SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-						SDL_RenderClear(sdlRend);
 						std::cout << "the current state is: " << currentState << std::endl;
 						if(currentState != IS_STOPPED){
+                            SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+                            SDL_RenderClear(sdlRend);
+                            SDL_RenderPresent(sdlRend);
+                        
 							currentState = IS_STOPPED;
 							SDL_CloseAudioDevice(currentDeviceID);
 						}
@@ -777,8 +769,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	//AllocConsole();
-    //freopen( "CON", "w", stdout );
+	AllocConsole();
+    freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
