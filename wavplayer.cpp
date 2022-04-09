@@ -186,12 +186,13 @@ void audioCallback(void* userData, Uint8* stream, int length){
 // try pitch shifting?? :/
 // https://www.kvraudio.com/forum/viewtopic.php?t=134637
 // https://www.kvraudio.com/forum/viewtopic.php?t=349092
-// it works, but IS SLOWWWWW! just don't think it's broken...
+// it works with Stephan Bernsee's solution, but note that it's slow. just don't think it's broken...
 // use gdb to run it and check
+// Olli Parviainen's SoundTouch is pretty fast.
 std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::SoundTouch& soundTouch){
 	// convert audio data to F32 
 	SDL_AudioCVT cvt;
-	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 1, DEF_SAMPLE_RATE, AUDIO_F32, 1, DEF_SAMPLE_RATE);
+	SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
 	cvt.len = wavLength;
 	cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
 	
@@ -204,7 +205,7 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
 	
 	int floatBufLen = (int)cvt.len_cvt / 4;
 	
-	uint numSamplesToProcess = (uint)floatBufLen;
+	uint numSamplesToProcess = (uint)floatBufLen / 2;  // assuming 2 channels
     
     std::vector<float> modifiedData;
     try{
@@ -212,11 +213,22 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
         soundTouch.putSamples(newData, numSamplesToProcess);
         
         do{
-          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen);
+          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / 2); // assuming 2 channels
           for(uint i = 0; i < numSamplesToProcess; i++){
             modifiedData.push_back(newData[i]);
           }
         }while(numSamplesToProcess != 0);
+        
+        /* flush the last samples in the buffer
+        soundTouch.flush();
+        do{
+          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / 2);
+          for(uint i = 0; i < numSamplesToProcess; i++){
+            modifiedData.push_back(newData[i]);
+          }
+          std::cout << "after flush\n";
+        }while(numSamplesToProcess != 0);
+        */
         
     }catch(const std::runtime_error &e){
         printf("%s\n", e.what());
@@ -533,8 +545,6 @@ DWORD WINAPI playPitchShiftedAudioProc(LPVOID lpParam){
 	int sampleRate = audioParams->sampleRate;
 	
 	playPitchShiftedAudio(filename, sampleRate);
-    
-    std::cout << "donep playing pitch-shifted audio\n";
 	
 	delete audioParams->filename;
 	delete audioParams;
@@ -769,8 +779,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	
-	AllocConsole();
-    freopen( "CON", "w", stdout );
+	//AllocConsole();
+    //freopen( "CON", "w", stdout );
 	
 	// needed on windows 7 
 	// see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
