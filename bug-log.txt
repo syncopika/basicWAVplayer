@@ -51,3 +51,6 @@ Thread 16 received signal SIGSEGV, Segmentation fault.
 #6  0x77527a7e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
 #7  0x77527a4e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
 #8  0x00000000 in ?? ()
+
+
+problem was that the wrong numbers were being used with SoundTouch's sendSamples() and receiveSamples()

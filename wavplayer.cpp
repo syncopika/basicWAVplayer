@@ -188,7 +188,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
 // https://www.kvraudio.com/forum/viewtopic.php?t=349092
 // it works with Stephan Bernsee's solution, but note that it's slow. just don't think it's broken...
 // use gdb to run it and check
-// Olli Parviainen's SoundTouch is pretty fast.
+// Olli Parviainen's SoundTouch works well but gets slower with larger audio files.
 std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::SoundTouch& soundTouch){
 	// convert audio data to F32 
 	SDL_AudioCVT cvt;
@@ -203,9 +203,11 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
 	// audio data is now in float form!
 	float* newData = (float*)cvt.buf;
 	
-	int floatBufLen = (int)cvt.len_cvt / 4;
+	int floatBufLen = (int)cvt.len_cvt / 4; // 4 bytes per float
+    
+    int numChannels = 2; // assuming 2 channels. TODO: don't assume this
 	
-	uint numSamplesToProcess = (uint)floatBufLen / 2;  // assuming 2 channels
+	int numSamplesToProcess = floatBufLen / numChannels;
     
     std::vector<float> modifiedData;
     try{
@@ -213,22 +215,11 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
         soundTouch.putSamples(newData, numSamplesToProcess);
         
         do{
-          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / 2); // assuming 2 channels
-          for(uint i = 0; i < numSamplesToProcess; i++){
-            modifiedData.push_back(newData[i]);
-          }
-        }while(numSamplesToProcess != 0);
-        
-        /* flush the last samples in the buffer
-        soundTouch.flush();
-        do{
-          numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / 2);
-          for(uint i = 0; i < numSamplesToProcess; i++){
-            modifiedData.push_back(newData[i]);
-          }
-          std::cout << "after flush\n";
-        }while(numSamplesToProcess != 0);
-        */
+            numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / numChannels); // assuming 2 channels
+            for(int i = 0; i < numSamplesToProcess * numChannels; i++){
+                modifiedData.push_back(newData[i]);
+            }
+        } while (numSamplesToProcess != 0);
         
     }catch(const std::runtime_error &e){
         printf("%s\n", e.what());
@@ -372,9 +363,7 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 	
 	wavSpec.userdata = &audio;
 	wavSpec.callback = audioCallback;
-	wavSpec.freq = sampleRate; // user-specified sample rate 
-	
-	std::cout << "the sample rate is: " << sampleRate << std::endl;
+	wavSpec.freq = sampleRate; // user-specified sample rate
 	
 	SDL_AudioDeviceID audioDevice;
 	audioDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
@@ -477,7 +466,7 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
 	AudioData audio;
 	audio.position = (Uint8*)audioData.data(); 
 	audio.length = (Uint32)(audioData.size() * sizeof(float));
-	
+    
 	SDL_AudioSpec pitchShiftSpec;
 	pitchShiftSpec.userdata = &audio;
 	pitchShiftSpec.callback = audioCallback;
@@ -700,8 +689,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 							AudioParams* audioParams = new AudioParams();
 							audioParams->filename = fname;
 							audioParams->sampleRate = sampleRate;
-							
-							std::cout << "playing pitch-shifted audio..." << std::endl;
+                            
 							audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
 						}else if(currentState == IS_PAUSED){
 							// start up paused audio device again
