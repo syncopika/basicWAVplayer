@@ -1,0 +1,56 @@
+pressing "play pitch shift" button first leads to a segfault
+
+gdb wavplayer.exe
+click some buttons
+bt to get stack trace
+
+Thread 9 received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 11864.0x32cc]
+0x766d8d4a in msvcrt!memcpy () from C:\WINDOWS\System32\msvcrt.dll
+(gdb) bt
+#0  0x766d8d4a in msvcrt!memcpy () from C:\WINDOWS\System32\msvcrt.dll
+#1  0x00405976 in soundtouch::FIFOSampleBuffer::putSamples (this=this@entry=0x291ec70,
+    samples=samples@entry=0x7fa90008, nSamples=nSamples@entry=651776)
+    at soundtouch/FIFOSampleBuffer.cpp:118
+#2  0x00409920 in soundtouch::TDStretch::putSamples (this=0x291ebf0, samples=0x7fa90008,
+    nSamples=651776) at soundtouch/TDStretch.cpp:609
+#3  0x00407d12 in soundtouch::SoundTouch::putSamples (this=0xbe0fea8, samples=0x7fa90008,
+    nSamples=651776) at soundtouch/SoundTouch.cpp:250
+#4  0x0040270e in pitchShift (wavStart=0x7fd10008 "", wavLength=1303552, soundTouch=...)
+    at wavplayer.cpp:224
+#5  0x00404498 in playPitchShiftedAudio (file="piano-test.wav", sampleRate=sampleRate@entry=44100)
+    at wavplayer.cpp:475
+#6  0x004046ab in playPitchShiftedAudioProc(void*)@4 (lpParam=0x291e488)
+    at c:/mingw-w64/i686/mingw32/lib/gcc/i686-w64-mingw32/8.1.0/include/c++/bits/basic_string.h:917
+#7  0x7676fa29 in KERNEL32!BaseThreadInitThunk () from C:\WINDOWS\System32\kernel32.dll
+#8  0x77527a7e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
+#9  0x77527a4e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
+#10 0x00000000 in ?? ()
+
+playing the regular audio first to completion and then trying to
+play the pitch-shifted audio also leads to segfault.
+
+
+but playing "play" first, stopping, and then "play pitch shift"
+works but then crashes after the pitch-shifted audio is played.
+
+Thread 16 received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 13052.0x293c]
+0x6c7a1b07 in SDL_LogCritical ()
+   from C:\Users\Nicholas\Desktop\my_projects\basicWAVplayer\SDL2.dll
+(gdb) bt
+#0  0x6c7a1b07 in SDL_LogCritical ()
+   from C:\Users\Nicholas\Desktop\my_projects\basicWAVplayer\SDL2.dll
+#1  0x6c832858 in ?? () from C:\Users\Nicholas\Desktop\my_projects\basicWAVplayer\SDL2.dll
+#2  0x6c7a3884 in SDL_LogCritical ()
+   from C:\Users\Nicholas\Desktop\my_projects\basicWAVplayer\SDL2.dll
+#3  0x7fbd0008 in ?? ()
+#4  0x004046ab in playPitchShiftedAudioProc(void*)@4 (lpParam=0x92efc8)
+    at c:/mingw-w64/i686/mingw32/lib/gcc/i686-w64-mingw32/8.1.0/include/c++/bits/basic_string.h:917
+#5  0x7676fa29 in KERNEL32!BaseThreadInitThunk () from C:\WINDOWS\System32\kernel32.dll
+#6  0x77527a7e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
+#7  0x77527a4e in ntdll!RtlGetAppContainerNamedObjectPath () from C:\WINDOWS\SYSTEM32\ntdll.dll
+#8  0x00000000 in ?? ()
+
+
+problem was that the wrong numbers were being used with SoundTouch's sendSamples() and receiveSamples()

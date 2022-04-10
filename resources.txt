@@ -1,55 +1,57 @@
 // some resources I visited 
-// https://adamtcroft.com/playing-sound-with-sdl-c/
-// https://davidgow.net/handmadepenguin/ch7.html
-// https://gigi.nullneuron.net/gigilabs/playing-a-wav-file-using-sdl2/
-// https://forums.libsdl.org/viewtopic.php?p=50240
-// https://stackoverflow.com/questions/10110905/simple-sound-wave-generator-with-sdl-in-c
-// https://stackoverflow.com/questions/8258398/c-how-to-combine-two-signed-8-bit-numbers-to-a-16-bit-short-unexplainable-res
-// https://stackoverflow.com/questions/28632721/does-16bit-integer-pcm-data-mean-its-signed-or-unsigned
-// https://stackoverflow.com/questions/34897166/sdl2-audio-callback-restricted-to-8bit
-// https://opensource.apple.com/source/IOAudioFamily/IOAudioFamily-183.4.2/Examples/Templates/SamplePCIAudioDriver/SampleAudioClip.cpp.auto.html
-// https://stackoverflow.com/questions/15087668/how-to-convert-pcm-samples-in-byte-array-as-floating-point-numbers-in-the-range
-// https://stackoverflow.com/questions/46177712/convert-int16-array-to-float
-// https://gamedev.stackexchange.com/questions/75983/sdl2-window-as-child-of-win32-gui
-// https://gamedev.stackexchange.com/questions/110205/context-is-null-with-sdl-createwindowfrom-win32
+https://adamtcroft.com/playing-sound-with-sdl-c/
+https://davidgow.net/handmadepenguin/ch7.html
+https://gigi.nullneuron.net/gigilabs/playing-a-wav-file-using-sdl2/
+https://forums.libsdl.org/viewtopic.php?p=50240
+https://stackoverflow.com/questions/10110905/simple-sound-wave-generator-with-sdl-in-c
+https://stackoverflow.com/questions/8258398/c-how-to-combine-two-signed-8-bit-numbers-to-a-16-bit-short-unexplainable-res
+https://stackoverflow.com/questions/28632721/does-16bit-integer-pcm-data-mean-its-signed-or-unsigned
+https://stackoverflow.com/questions/34897166/sdl2-audio-callback-restricted-to-8bit
+https://opensource.apple.com/source/IOAudioFamily/IOAudioFamily-183.4.2/Examples/Templates/SamplePCIAudioDriver/SampleAudioClip.cpp.auto.html
+https://stackoverflow.com/questions/15087668/how-to-convert-pcm-samples-in-byte-array-as-floating-point-numbers-in-the-range
+https://stackoverflow.com/questions/46177712/convert-int16-array-to-float
+https://gamedev.stackexchange.com/questions/75983/sdl2-window-as-child-of-win32-gui
+https://gamedev.stackexchange.com/questions/110205/context-is-null-with-sdl-createwindowfrom-win32
+https://stackoverflow.com/questions/2908057/can-i-compile-all-cpp-files-in-src-to-os-in-obj-then-link-to-binary-in
 
 // wav file info 
-// http://www.cplusplus.com/forum/general/205408/
-// https://stackoverflow.com/questions/29416260/incorrect-audio-data-when-saving-wav-file-using-c-based-on-a-c-sharp-program
-// https://stackoverflow.com/questions/31024177/export-buffer-to-wav-in-c
-// https://stackoverflow.com/questions/24539510/write-wave-header-and-add-data-without-closing-ofstream
-// http://www.cplusplus.com/forum/beginner/166954/
+http://www.cplusplus.com/forum/general/205408/
+https://stackoverflow.com/questions/29416260/incorrect-audio-data-when-saving-wav-file-using-c-based-on-a-c-sharp-program
+https://stackoverflow.com/questions/31024177/export-buffer-to-wav-in-c
+https://stackoverflow.com/questions/24539510/write-wave-header-and-add-data-without-closing-ofstream
+http://www.cplusplus.com/forum/beginner/166954/
 
 // pitch/time scaling 
-// https://en.wikipedia.org/wiki/Audio_time_stretching_and_pitch_scaling
-// https://www.dsprelated.com/showthread/comp.dsp/50777-1.php
-// https://dsp.stackexchange.com/questions/45794/how-to-change-speed-of-audio-samples-without-changing-pitch
-// https://www.surina.net/article/time-and-pitch-scaling.html
-// https://stackoverflow.com/questions/5156192/programmatically-increase-the-pitch-of-an-array-of-audio-samples
-
-// https://www.surina.net/soundtouch/
-// https://softwarerecs.stackexchange.com/questions/36289/c-c-library-for-changing-pitch-without-altering-formant-frequencies
+https://en.wikipedia.org/wiki/Audio_time_stretching_and_pitch_scaling
+https://www.dsprelated.com/showthread/comp.dsp/50777-1.php
+https://dsp.stackexchange.com/questions/45794/how-to-change-speed-of-audio-samples-without-changing-pitch
+https://www.surina.net/article/time-and-pitch-scaling.html
+https://stackoverflow.com/questions/5156192/programmatically-increase-the-pitch-of-an-array-of-audio-samples
+https://www.kvraudio.com/forum/viewtopic.php?t=134637
+https://www.kvraudio.com/forum/viewtopic.php?t=349092
+https://www.surina.net/soundtouch/
+https://softwarerecs.stackexchange.com/questions/36289/c-c-library-for-changing-pitch-without-altering-formant-frequencies
 
 // with a gui, need to handle music stuff in another thread cause it'll block 
-// https://forums.libsdl.org/viewtopic.php?p=40771
+https://forums.libsdl.org/viewtopic.php?p=40771
 
 // multithreading with win32 
-// https://stackoverflow.com/questions/4768294/multithreading-in-c
-// https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createthread
-// https://msdn.microsoft.com/en-us/f0dc203f-200e-42f1-940c-24e3fe080175
+https://stackoverflow.com/questions/4768294/multithreading-in-c
+https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createthread
+https://msdn.microsoft.com/en-us/f0dc203f-200e-42f1-940c-24e3fe080175
 
 // audio visualization?
-// https://2captiv8.blogspot.com/2016/06/howto-design-code-music-visualization-visualizer-audio-linux-c-sdl-fourier.html
-// https://www.perl.com/pub/2011/01/visualizing-music-with-sdl-and-perl.html/
+https://2captiv8.blogspot.com/2016/06/howto-design-code-music-visualization-visualizer-audio-linux-c-sdl-fourier.html
+https://www.perl.com/pub/2011/01/visualizing-music-with-sdl-and-perl.html/
 https://stackoverflow.com/questions/2066090/plotting-waveform-of-the-wav-file
 https://stackoverflow.com/questions/26663494/algorithm-to-draw-waveform-from-audio
 https://stackoverflow.com/questions/18771375/c-reading-16bit-wav-file
 https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
 
 // good general audio info 
-// http://artsites.ucsc.edu/EMS/music/tech_background/TE-16/teces_16.html
-// http://digitalsoundandmusic.com/chapters/ch2/
-// https://stackoverflow.com/questions/25940376/whats-the-actual-data-in-a-wav-file
-// https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-sample-data
+http://artsites.ucsc.edu/EMS/music/tech_background/TE-16/teces_16.html
+http://digitalsoundandmusic.com/chapters/ch2/
+https://stackoverflow.com/questions/25940376/whats-the-actual-data-in-a-wav-file
+https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-sample-data
 https://subscription.packtpub.com/book/game_development/9781849699099/1/ch01lvl1sec09/analog-and-digital-audio
 https://gist.github.com/endolith/e8597a58bcd11a6462f33fa8eb75c43d

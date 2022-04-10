@@ -1,0 +1,13 @@
+- improve visualization part
+  - pretty buggy stil with stop and play for some reason.
+
+- make pitch shifting customizable (allow user to adjust semitone delta)
+  - also show some status text in the UI when processing for pitch shifting? something like "processing..."?
+  - maybe also show status as text like "playing" or "stopped" or "paused"
+
+- try allowing time stretching as well? (change tempo w/o modifying pitch)
+  - looks like it's supported by SoundTouch: https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundTouch/SoundTouch.cpp#L32
+
+- timestamp? marker to show how many seconds has elapsed, total time to play 
+- turn karaoke off or on with a radio button? (rather than separate button)
+- anyway to make things faster for pitch shifting? maybe try the MMX/SSE optimizations from SoundTouch?
