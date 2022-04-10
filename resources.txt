@@ -27,7 +27,8 @@ https://www.dsprelated.com/showthread/comp.dsp/50777-1.php
 https://dsp.stackexchange.com/questions/45794/how-to-change-speed-of-audio-samples-without-changing-pitch
 https://www.surina.net/article/time-and-pitch-scaling.html
 https://stackoverflow.com/questions/5156192/programmatically-increase-the-pitch-of-an-array-of-audio-samples
-
+https://www.kvraudio.com/forum/viewtopic.php?t=134637
+https://www.kvraudio.com/forum/viewtopic.php?t=349092
 https://www.surina.net/soundtouch/
 https://softwarerecs.stackexchange.com/questions/36289/c-c-library-for-changing-pitch-without-altering-formant-frequencies
 
