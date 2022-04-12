@@ -28,7 +28,6 @@
 #define VISUALIZER_WINDOW_WIDTH 510
 #define VISUALIZER_WINDOW_HEIGHT 180
 
-
 // enum for current play state 
 enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED};
 
@@ -755,7 +754,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
-    
     //AllocConsole();
     //freopen( "CON", "w", stdout );
     
@@ -809,6 +807,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         MessageBox(NULL, "window creation failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
+    
+    
+    /* file dialog!!!! :D
+    // https://stackoverflow.com/questions/4167286/win32-function-to-openfiledialog
+    OPENFILENAME ofn;       // common dialog box structure
+    TCHAR szFile[260] = { 0 };       // if using TCHAR macros
+
+    // Initialize OPENFILENAME
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd; // give it to a button?
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "All\0*.*\0Text\0*.TXT\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    if (GetOpenFileName(&ofn) == TRUE)
+    {
+        // use ofn.lpstrFile
+    }
+    */
+    
     
     // add a label to the add file text edit box
     HWND addWAVPathLabel = CreateWindow(

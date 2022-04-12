@@ -13,6 +13,9 @@ https://stackoverflow.com/questions/46177712/convert-int16-array-to-float
 https://gamedev.stackexchange.com/questions/75983/sdl2-window-as-child-of-win32-gui
 https://gamedev.stackexchange.com/questions/110205/context-is-null-with-sdl-createwindowfrom-win32
 https://stackoverflow.com/questions/2908057/can-i-compile-all-cpp-files-in-src-to-os-in-obj-then-link-to-binary-in
+https://docs.microsoft.com/en-us/windows/win32/learnwin32/example--the-open-dialog-box
+https://stackoverflow.com/questions/24173443/msdn-open-dialog-box-sample-code
+https://stackoverflow.com/questions/4167286/win32-function-to-openfiledialog
 
 // wav file info 
 http://www.cplusplus.com/forum/general/205408/
