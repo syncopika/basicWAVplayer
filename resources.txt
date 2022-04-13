@@ -16,6 +16,7 @@ https://stackoverflow.com/questions/2908057/can-i-compile-all-cpp-files-in-src-t
 https://docs.microsoft.com/en-us/windows/win32/learnwin32/example--the-open-dialog-box
 https://stackoverflow.com/questions/24173443/msdn-open-dialog-box-sample-code
 https://stackoverflow.com/questions/4167286/win32-function-to-openfiledialog
+https://stackoverflow.com/questions/38774248/how-to-save-ofn-lpstrfile-to-string-properly
 
 // wav file info 
 http://www.cplusplus.com/forum/general/205408/
