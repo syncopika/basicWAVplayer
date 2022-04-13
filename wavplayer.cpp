@@ -28,7 +28,6 @@
 #define VISUALIZER_WINDOW_WIDTH 510
 #define VISUALIZER_WINDOW_HEIGHT 180
 
-
 // enum for current play state 
 enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED};
 
@@ -536,6 +535,23 @@ DWORD WINAPI saveKaraokeAudio(LPVOID lpParam){
     return 0;
 }
 
+void getFile(HWND buttonHandle, HWND textBox){
+    OPENFILENAME ofn;
+    TCHAR szFile[260] = {0};
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = buttonHandle;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "Audio Files\0*.wav\0\0";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    if(GetOpenFileName(&ofn))
+    {
+        SetWindowText(textBox, ofn.lpstrFile);
+    }
+}
+
 
 // procedure for main window 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
@@ -640,8 +656,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     break;
                 
                 case ID_PITCH_SHIFT:    
-                {
-                    if(currentState == IS_STOPPED){
+                    {
+                        if(currentState == IS_STOPPED){
                             // get the file first from the text area 
                             HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
                             int textLength = GetWindowTextLength(textbox);
@@ -686,9 +702,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             SDL_PauseAudioDevice(currentDeviceID, 0);
                             currentState = IS_PLAYING;
                         }
-                }
-                break;
-                
+                    }
+                    break;
+                case ID_FILE_DIALOG:
+                    {
+                        HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+                        HWND button = GetDlgItem(hwnd, ID_FILE_DIALOG);
+                        getFile(button, textbox);
+                    }
+                    break;
                 case ID_PAUSE_BUTTON:
                     // implement me 
                     {
@@ -755,7 +777,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
-    
     //AllocConsole();
     //freopen( "CON", "w", stdout );
     
@@ -830,13 +851,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT(""),
         WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL, 
         160, 30, 
-        280, 20,
+        250, 20,
         hwnd,
         (HMENU)ID_ADDWAVPATH,
         hInstance,
         NULL
     );
     SendMessage(addWAVPath, WM_SETFONT, (WPARAM)hFont, true);
+    
+    // button for file dialog
+    HWND wavFileDialog = CreateWindow(
+        TEXT("button"),
+        TEXT("find file"),
+        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+        420, 30, 
+        100, 20, 
+        hwnd,
+        (HMENU)ID_FILE_DIALOG,
+        hInstance,
+        NULL
+    );
+    SendMessage(wavFileDialog, WM_SETFONT, (WPARAM)hFont, true);
     
     // specify sample rate
     HWND addSampleRateLabel = CreateWindow(
