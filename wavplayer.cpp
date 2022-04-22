@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <cstdio>
+#include <ctime>
 #include <stdexcept>
 
 // SoundTouch code by Olli Parviainen
@@ -198,6 +199,12 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     int numSamplesToProcess = floatBufLen / numChannels;
     
     std::vector<float> modifiedData;
+    
+    
+    std::time_t t1 = std::time(0);
+    std::cout << "curr time start: " << t1 << " seconds\n";
+    
+    
     try{
         // https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp#L191
         soundTouch.putSamples(newData, numSamplesToProcess);
@@ -212,6 +219,12 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     }catch(const std::runtime_error &e){
         printf("%s\n", e.what());
     }
+    
+    
+    std::time_t t2 = std::time(0);
+    std::cout << "curr time stop: " << t2 << " seconds\n";
+    std::cout << "total time elapsed: " << t2 - t1 << " seconds\n";
+    
     
     // make sure to free allocated space!
     SDL_free(cvt.buf);
@@ -777,8 +790,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
-    //AllocConsole();
-    //freopen( "CON", "w", stdout );
+    AllocConsole();
+    freopen( "CON", "w", stdout );
     
     // needed on windows 7 
     // see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
