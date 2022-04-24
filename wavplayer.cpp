@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <cstdio>
+#include <ctime>
 #include <stdexcept>
 
 // SoundTouch code by Olli Parviainen
@@ -195,23 +196,45 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     
     int numChannels = 2; // assuming 2 channels. TODO: don't assume this
     
-    int numSamplesToProcess = floatBufLen / numChannels;
+    int buffSizeSamples = floatBufLen / numChannels;
     
-    std::vector<float> modifiedData;
+    // https://stackoverflow.com/questions/56370244/is-stdpush-back-relatively-expensive-to-use
+    // https://lemire.me/blog/2012/06/20/do-not-waste-time-with-stl-vectors/
+    std::vector<float> modifiedData(floatBufLen);
+    
+    // TODO: testing, remove later
+    //std::time_t t1 = std::time(0);
+    //std::cout << "curr time start: " << t1 << " seconds\n";
+    
+    int numChunks = 8;
+    int sampleChunkSize = floatBufLen / numChunks; // number of floats per chunk
+    
+    int counter = 0;
     try{
         // https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp#L191
-        soundTouch.putSamples(newData, numSamplesToProcess);
-        
-        do{
-            numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / numChannels); // assuming 2 channels
-            for(int i = 0; i < numSamplesToProcess * numChannels; i++){
-                modifiedData.push_back(newData[i]);
-            }
-        } while (numSamplesToProcess != 0);
+        for(int k = 0; k < numChunks; k++){
+            int nSamples = sampleChunkSize / numChannels;
+            float* nextDataToProcess = newData+(sampleChunkSize*k);
+            
+            soundTouch.putSamples(nextDataToProcess, nSamples);
+            
+            do{
+                nSamples = soundTouch.receiveSamples(nextDataToProcess, buffSizeSamples); // assuming 2 channels
+                
+                for(int i = 0; i < nSamples * numChannels; i++){
+                    modifiedData[counter++] = nextDataToProcess[i];
+                }
+            } while (nSamples != 0);
+        }
         
     }catch(const std::runtime_error &e){
         printf("%s\n", e.what());
     }
+    
+    // TODO: testing, remove later
+    //std::time_t t2 = std::time(0);
+    //std::cout << "curr time stop: " << t2 << " seconds\n";
+    //std::cout << "total time elapsed: " << t2 - t1 << " seconds\n";
     
     // make sure to free allocated space!
     SDL_free(cvt.buf);
@@ -777,6 +800,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    // uncomment these for seeing console output when debugging
     //AllocConsole();
     //freopen( "CON", "w", stdout );
     

@@ -638,7 +638,7 @@ TDStretch * TDStretch::newInstance()
 {
     uint uExtensions;
     uExtensions = detectCPUextensions();
-/* edit by syncopika: I don't think we need MMX/SSE stuff so commenting out...
+
     // Check if MMX/SSE instruction set extensions supported by CPU
 #ifdef SOUNDTOUCH_ALLOW_MMX
     // MMX routines available only with integer sample types
@@ -656,7 +656,6 @@ TDStretch * TDStretch::newInstance()
     }
     else
 #endif // SOUNDTOUCH_ALLOW_SSE
-*/
     {
         // ISA optimizations not supported, use plain C version
         return ::new TDStretch;

@@ -37,6 +37,7 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
+#include <iostream>
 #include <memory.h>
 #include <assert.h>
 #include <math.h>
@@ -255,12 +256,12 @@ FIRFilter * FIRFilter::newInstance()
     uint uExtensions;
     uExtensions = detectCPUextensions();
     
-/* edit by syncopika: don't think we need MMX/SSE stuff so commenting out...
     // Check if MMX/SSE instruction set extensions supported by CPU
 #ifdef SOUNDTOUCH_ALLOW_MMX
     // MMX routines available only with integer sample types
     if (uExtensions & SUPPORT_MMX)
     {
+        std::cout << "MMX support detected - using FIRFilterMMX\n";
         return ::new FIRFilterMMX;
     }
     else
@@ -268,14 +269,15 @@ FIRFilter * FIRFilter::newInstance()
 #ifdef SOUNDTOUCH_ALLOW_SSE
     if (uExtensions & SUPPORT_SSE)
     {
+        std::cout << "SSE support detected - using FIRFilterSSE\n";
         // SSE support
         return ::new FIRFilterSSE;
     }
     else
 #endif // SOUNDTOUCH_ALLOW_SSE
-*/
     {
         // ISA optimizations not supported, use plain C version
+        std::cout << "ISA optimizations not supported\n";
         return ::new FIRFilter;
     }
 }

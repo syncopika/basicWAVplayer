@@ -10,4 +10,3 @@
 
 - timestamp? marker to show how many seconds has elapsed, total time to play 
 - turn karaoke off or on with a radio button? (rather than separate button)
-- any way to make things faster for pitch shifting? maybe try the MMX/SSE optimizations from SoundTouch?
