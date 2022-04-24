@@ -198,21 +198,32 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     
     int numSamplesToProcess = floatBufLen / numChannels;
     
-    std::vector<float> modifiedData;
+    // https://stackoverflow.com/questions/56370244/is-stdpush-back-relatively-expensive-to-use
+    // https://lemire.me/blog/2012/06/20/do-not-waste-time-with-stl-vectors/
+    std::vector<float> modifiedData(floatBufLen);
     
-    
+    // TODO: testing, remove later
     std::time_t t1 = std::time(0);
     std::cout << "curr time start: " << t1 << " seconds\n";
     
     
     try{
         // https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp#L191
-        soundTouch.putSamples(newData, numSamplesToProcess);
+        soundTouch.putSamples(newData, numSamplesToProcess); // TODO: potential bottleneck?
+        
+        int thing = floatBufLen / numChannels;
+        int counter = 0;
         
         do{
-            numSamplesToProcess = soundTouch.receiveSamples(newData, floatBufLen / numChannels); // assuming 2 channels
-            for(int i = 0; i < numSamplesToProcess * numChannels; i++){
-                modifiedData.push_back(newData[i]);
+            numSamplesToProcess = soundTouch.receiveSamples(newData, thing); // assuming 2 channels
+            int thing2 = numSamplesToProcess * numChannels;
+            
+            // TODO: testing, remove later
+            std::cout << "num samples to process: " << numSamplesToProcess << "\n";
+            
+            for(int i = 0; i < thing2; i++){
+                //modifiedData.push_back(newData[i]);
+                modifiedData[counter++] = newData[i];
             }
         } while (numSamplesToProcess != 0);
         
@@ -220,7 +231,7 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
         printf("%s\n", e.what());
     }
     
-    
+    // TODO: testing, remove later
     std::time_t t2 = std::time(0);
     std::cout << "curr time stop: " << t2 << " seconds\n";
     std::cout << "total time elapsed: " << t2 - t1 << " seconds\n";
