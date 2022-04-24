@@ -10,12 +10,3 @@
 
 - timestamp? marker to show how many seconds has elapsed, total time to play 
 - turn karaoke off or on with a radio button? (rather than separate button)
-
-- any way to make things faster for pitch shifting? maybe try the MMX/SSE optimizations from SoundTouch?
-  - when we compile do we need to set a flag somewhere for these optimizations to work? need to investigate
-    not sure how to know if that code is actually being used (maybe do some logging?)
-  - also check my own code? maybe the way I'm handling the data isn't ideal.
-
-  resources:
-  - see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundTouch/Makefile.am
-  - also useful: https://wiki.gentoo.org/wiki/GCC_optimization#-msse.2C_-msse2.2C_-msse3.2C_-mmmx.2C_-m3dnow
