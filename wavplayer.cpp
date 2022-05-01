@@ -1,16 +1,18 @@
-#include <iostream>
-#include <vector>
-#include <fstream>
-#include <ctype.h>
-#include <math.h>
-#include <string>
-#include <fcntl.h>
-#include <SDL.h>
-#include <windows.h>
-#include <stdlib.h>
 #include <cstdio>
-#include <ctime>
+#include <fstream>
+#include <iostream>
 #include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <windows.h> // important that this comes before commctrl.h
+#include <ctype.h>
+#include <fcntl.h>
+#include <math.h>
+#include <SDL.h>
+#include <stdlib.h>
+#include <commctrl.h>
+//#include <ctime>
 
 // SoundTouch code by Olli Parviainen
 #include "soundtouch/SoundTouch.h"
@@ -28,6 +30,9 @@
 #define GUI_HEIGHT 450
 #define VISUALIZER_WINDOW_WIDTH 510
 #define VISUALIZER_WINDOW_HEIGHT 180
+
+// max value for pitch shift
+#define MAX_PITCH_SHIFT 5
 
 // enum for current play state 
 enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED};
@@ -57,6 +62,9 @@ HANDLE audioThread;
 // the sdl window and renderer for visualization 
 SDL_Window* sdlWnd;
 SDL_Renderer* sdlRend;
+
+// amount to pitch shift
+int pitchShiftValue = 0; //2;
 
 // get the name of the file 
 std::string getFilename(std::string file){
@@ -202,10 +210,6 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     // https://lemire.me/blog/2012/06/20/do-not-waste-time-with-stl-vectors/
     std::vector<float> modifiedData(floatBufLen);
     
-    // TODO: testing, remove later
-    //std::time_t t1 = std::time(0);
-    //std::cout << "curr time start: " << t1 << " seconds\n";
-    
     int numChunks = 8;
     int sampleChunkSize = floatBufLen / numChunks; // number of floats per chunk
     
@@ -230,11 +234,6 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
     }catch(const std::runtime_error &e){
         printf("%s\n", e.what());
     }
-    
-    // TODO: testing, remove later
-    //std::time_t t2 = std::time(0);
-    //std::cout << "curr time stop: " << t2 << " seconds\n";
-    //std::cout << "total time elapsed: " << t2 - t1 << " seconds\n";
     
     // make sure to free allocated space!
     SDL_free(cvt.buf);
@@ -469,7 +468,7 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     soundtouch::SoundTouch soundTouch;
     soundTouch.setSampleRate(sampleRate);
     soundTouch.setChannels(2);
-    soundTouch.setPitchSemiTones(2); // raise pitch by 2 semitones TODO: make this something a user can change
+    soundTouch.setPitchSemiTones(pitchShiftValue);
     
     // pass soundtouch to pitchShift and do the thing
     std::vector<float> audioData = pitchShift(wavStart, wavLength, soundTouch);
@@ -569,8 +568,7 @@ void getFile(HWND buttonHandle, HWND textBox){
     ofn.lpstrFilter = "Audio Files\0*.wav\0\0";
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-    if(GetOpenFileName(&ofn))
-    {
+    if(GetOpenFileName(&ofn)){
         SetWindowText(textBox, ofn.lpstrFile);
     }
 }
@@ -603,7 +601,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
                             int textLengthSample = GetWindowTextLength(sampleRateTextBox);
                                 
-                            TCHAR sampleRateText[textLengthSample+1];
+                            TCHAR sampleRateText[textLengthSample + 1];
                             GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
                                 
                             // get the sample rate as a string
@@ -777,6 +775,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     break;
             }
             break;
+        case WM_HSCROLL:
+            {
+                // handle trackbar/slider activity
+                switch(LOWORD(wParam)){
+                    case TB_THUMBTRACK:
+                    {
+                        HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
+                        DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                        
+                        // the slider can only handle unsigned ints so we do some math
+                        // to make sure the value is between -MAX_PITCH_SHIFT and MAX_PITCH_SHIFT.
+                        // note that the range of the slider is 0 - MAX_PITCH_SHIFT*2.
+                        int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
+                        
+                        pitchShiftValue = actualPitchShiftVal;
+                        
+                        SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                    }
+                    break;
+                }
+                break;
+            }
         case WM_CLOSE:
             {
                 SDL_Quit();
@@ -797,6 +817,52 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
     
     return 0;
 }
+
+// function to create and setup slider/trackbar for setting pitch shift value
+void setupPitchShiftSlider(
+    int width,
+    int height,
+    int xCoord,
+    int yCoord,
+    HWND parent,
+    HINSTANCE hInstance,
+    HFONT hFont
+){
+    HWND slider = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        TRACKBAR_CLASS,
+        "pitch shift control",
+        WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS | TBS_ENABLESELRANGE,
+        xCoord, yCoord,
+        width, height,
+        parent,
+        (HMENU)ID_PITCH_SHIFT_SLIDER,
+        hInstance,
+        NULL
+    );
+    
+    // note! we're restricted to using only unsigned ints (so no negatives)
+    // but I really mean the range for pitch shift values will be -5 to 5.
+    int maxVal = MAX_PITCH_SHIFT*2;
+    int minVal = 0;
+    SendMessage(slider, WM_SETFONT, (WPARAM)hFont, true);
+    SendMessage(slider, TBM_SETRANGE, (WPARAM)true, (LPARAM)MAKELONG(minVal, maxVal));
+    SendMessage(slider, TBM_SETPOS, (WPARAM)true, (LPARAM)MAX_PITCH_SHIFT);
+}
+
+// function for creating buttons
+void setupButton(
+    int width,
+    int height,
+    int xCoord,
+    int yCoord,
+    HWND parent,
+    HINSTANCE hInstance,
+    HFONT hFont
+){
+    // TODO
+}
+
 
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
@@ -874,7 +940,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("edit"),
         TEXT(""),
         WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL, 
-        160, 30, 
+        150, 30, 
         250, 20,
         hwnd,
         (HMENU)ID_ADDWAVPATH,
@@ -915,7 +981,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("edit"),
         TEXT("44100"),
         WS_VISIBLE | WS_CHILD | WS_BORDER,
-        180, 80, 
+        170, 80, 
         70, 20, 
         hwnd,
         (HMENU)ID_SPECIFY_SAMPLE_RATE,
@@ -929,14 +995,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("button"),
         TEXT("play pitch shift"),
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        280, 80, 
-        100, 20, 
+        260, 80, // x, y
+        100, 20, // width, height 
         hwnd,
         (HMENU)ID_PITCH_SHIFT,
         hInstance,
         NULL
     );
     SendMessage(playPitchShift, WM_SETFONT, (WPARAM)hFont, true);
+    
+    // slider/trackbar for selecting pitch shift value
+    setupPitchShiftSlider(160, 20, 370, 80, hwnd, hInstance, hFont);
+    
+    // add a label so we can display the current pitch shift value
+    HWND addPitchShiftLabel = CreateWindow(
+        TEXT("STATIC"),
+        TEXT("0"), // pitch shift value is 0 by default
+        WS_VISIBLE | WS_CHILD,
+        540, 80,
+        40, 20,
+        hwnd,
+        (HMENU)ID_PITCH_SHIFT_SLIDER_LABEL,
+        hInstance,
+        NULL
+    );
+    SendMessage(addPitchShiftLabel, WM_SETFONT, (WPARAM)hFont, true);    
     
     // make a button to play 
     HWND playButton = CreateWindow(

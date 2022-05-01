@@ -20,6 +20,8 @@ https://stackoverflow.com/questions/38774248/how-to-save-ofn-lpstrfile-to-string
 https://stackoverflow.com/questions/36719876/how-to-filter-out-files-with-multiple-criteria-in-a-makefile
 https://stackoverflow.com/questions/40155241/how-to-properly-use-or-asterisk-symbols-as-a-placeholder-in-makefile
 https://stackoverflow.com/questions/13592154/gnu-make-using-the-filter-function-in-prerequisites
+https://docs.microsoft.com/en-us/windows/win32/controls/trackbar-controls
+https://docs.microsoft.com/en-us/windows/win32/controls/create-a-trackbar
 
 // wav file info 
 http://www.cplusplus.com/forum/general/205408/
