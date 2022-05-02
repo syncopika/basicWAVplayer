@@ -624,11 +624,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->sampleRate = sampleRate;
                             
                             audioThread = CreateThread(NULL, 0, playAudioProc, audioParams, 0, 0);
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }else if(currentState == IS_PAUSED){
                             // start up paused audio device again
                             std::cout << "starting where we left off..." << std::endl;
                             SDL_PauseAudioDevice(currentDeviceID, 0);
                             currentState = IS_PLAYING;
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
                     break;
@@ -672,6 +674,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->sampleRate = sampleRate;
                             
                             audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, audioParams, 0, 0);
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
                     break;
@@ -717,11 +720,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->sampleRate = sampleRate;
                             
                             audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }else if(currentState == IS_PAUSED){
                             // start up paused audio device again
                             std::cout << "starting where we left off..." << std::endl;
                             SDL_PauseAudioDevice(currentDeviceID, 0);
                             currentState = IS_PLAYING;
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
                     break;
@@ -740,6 +745,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         
                             // halt the audio device callback function 
                             SDL_PauseAudioDevice(currentDeviceID, 1);
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: paused");
                         }
                     }
                     break;
@@ -753,6 +759,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         
                             currentState = IS_STOPPED;
                             SDL_CloseAudioDevice(currentDeviceID);
+                            
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
                         }
                     }
                     break;
@@ -1020,6 +1028,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         NULL
     );
     SendMessage(addPitchShiftLabel, WM_SETFONT, (WPARAM)hFont, true);    
+    
+    // display the current state of the app
+    HWND currStateLabel = CreateWindow(
+        TEXT("STATIC"),
+        TEXT("current state: stopped"),
+        WS_VISIBLE | WS_CHILD,
+        230, 115,
+        180, 20,
+        hwnd,
+        (HMENU)ID_CURR_STATE_LABEL,
+        hInstance,
+        NULL
+    );
+    SendMessage(currStateLabel, WM_SETFONT, (WPARAM)hFont, true);
     
     // make a button to play 
     HWND playButton = CreateWindow(
