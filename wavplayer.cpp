@@ -135,10 +135,10 @@ std::vector<int> getSampleIndices(int dataLen, int numSamples){
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
     AudioData* audio = (AudioData*)userData;
-    float* streamF = (float *)stream;
+    float* streamF = (float*)stream;
     
     if(audio->length == 0){
-        // stop playing stream here??
+        // stop playing stream here
         return;
     }
     
@@ -150,7 +150,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
     }
     
     int desiredNumPointsToDisplay = 1000; // number of data points to show at a time on the screen
-    std::vector<int> sampleIndices = getSampleIndices((int)len-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
+    std::vector<int> sampleIndices = getSampleIndices(length-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
     
     SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(sdlRend);
@@ -161,19 +161,22 @@ void audioCallback(void* userData, Uint8* stream, int length){
     for(int i = 0; i < (int)sampleIndices.size(); i++){
         int sampleIdx = sampleIndices[i];
 
-        // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
-        int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+        if(sampleIdx+1 < length){
+            // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
+            int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
         
-        int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
+            int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
         
-        if(scaledVal >= 70){
-            scaledVal = 0;
+            if(scaledVal >= 70){
+                scaledVal = 0;
+            }
+        
+            int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
+        
+            SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
         }
-        
-        int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
-        
-        SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
     }
+    
     SDL_RenderPresent(sdlRend);
     
     // copy len bytes from audio stream at audio->position to stream buffer
@@ -390,8 +393,9 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     SDL_PauseAudioDevice(audioDevice, 0);
     currentState = IS_PLAYING;
     
-    while(audio.length > 0){
-        SDL_Delay(30); // set some delay so program doesn't immediately quit 
+    while(audio.length > 0 && currentState != IS_STOPPED){
+        // as long as there's audio data left to play, keep the thread alive with this while loop
+        SDL_Delay(10);
     }
     
     // done playing audio. make sure to free stuff. 
@@ -440,8 +444,9 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     SDL_PauseAudioDevice(audioDevice, 0);
     currentState = IS_PLAYING;
     
-    while(audio.length > 0){
-        SDL_Delay(30); // set some delay so program doesn't immediately quit 
+    while(audio.length > 0 && currentState != IS_STOPPED){
+        // keep thread alive
+        SDL_Delay(10);
     }
     
     // done playing audio. make sure to free stuff 
@@ -493,8 +498,9 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     SDL_PauseAudioDevice(audioDevice, 0);
     currentState = IS_PLAYING;
     
-    while(audio.length > 0){
-        SDL_Delay(30); // set some delay so program doesn't immediately quit 
+    while(audio.length > 0 && currentState != IS_STOPPED){
+        // keep thread alive
+        SDL_Delay(10);
     }
     
     // done playing audio. make sure to free stuff 
@@ -606,7 +612,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                                 
                             // get the sample rate as a string
                             std::string sampleRateString = std::string((char*)sampleRateText);
-                            //std::cout << sampleRateString << std::endl;
                             
                             // extract the int value from the string 
                             sampleRate = extractInt(sampleRateString);
@@ -656,7 +661,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                                 
                             // get the sample rate as a string
                             std::string sampleRateString = std::string((char*)sampleRateText);
-                            //std::cout << sampleRateString << std::endl;
                             
                             // extract the int value from the string 
                             sampleRate = extractInt(sampleRateString);
@@ -737,8 +741,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         getFile(button, textbox);
                     }
                     break;
-                case ID_PAUSE_BUTTON:
-                    // implement me 
+                case ID_PAUSE_BUTTON: 
                     {
                         if(currentState == IS_PLAYING){
                             currentState = IS_PAUSED;
@@ -772,7 +775,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         GetWindowText(textbox, filename, textLength + 1);
                         char* fname = (char*)(filename);
                         
-                        // Y U NO OUTPUT!?? - see: https://stackoverflow.com/questions/40500616/c-11-stdthread-use-ofstream-output-stuff-but-get-nothing-why
+                        // https://stackoverflow.com/questions/40500616/c-11-stdthread-use-ofstream-output-stuff-but-get-nothing-why
                         // https://stackoverflow.com/questions/11779504/join-equivalent-in-windows
                         HANDLE saveThread = CreateThread(NULL, 0, saveKaraokeAudio, fname, 0, 0);
                         
@@ -875,8 +878,8 @@ void setupButton(
 // the main method to launch gui 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
     // uncomment these for seeing console output when debugging
-    //AllocConsole();
-    //freopen( "CON", "w", stdout );
+    AllocConsole();
+    freopen( "CON", "w", stdout );
     
     // needed on windows 7 
     // see https://stackoverflow.com/questions/22960325/no-audio-with-sdl-c
