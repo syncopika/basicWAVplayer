@@ -276,3 +276,7 @@ Thread 57 received signal SIGSEGV, Segmentation fault.
 audioCallback (userData=0x1176fed8, stream=0x117cc050 "", length=16384) at wavplayer.cpp:165
 165             int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
 
+In each thread spawned when we play (assuming current state is STOPPED), we do update some global variables.
+should we lock them? namely currentDeviceID and currentState. maybe can move currentState update outside of thread control
+and rethink play/pause/stop logic.
+

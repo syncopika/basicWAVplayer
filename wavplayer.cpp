@@ -137,7 +137,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
     AudioData* audio = (AudioData*)userData;
     float* streamF = (float*)stream;
     
-    if(audio->length == 0){
+    if(audio->length == 0 || currentState == IS_STOPPED){
         // stop playing stream here
         return;
     }
@@ -391,14 +391,13 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     
     // play 
     SDL_PauseAudioDevice(audioDevice, 0);
-    currentState = IS_PLAYING;
     
-    while(audio.length > 0 && currentState != IS_STOPPED){
-        // as long as there's audio data left to play, keep the thread alive with this while loop
+    while(audio.length > 0){
+        // as long as there's audio data left to play, keep the thread that this code is running in alive with this while loop
         SDL_Delay(10);
     }
     
-    // done playing audio. make sure to free stuff. 
+    // done playing audio. make sure to free stuff.
     currentState = IS_STOPPED;
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
@@ -442,9 +441,8 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     
     // play 
     SDL_PauseAudioDevice(audioDevice, 0);
-    currentState = IS_PLAYING;
     
-    while(audio.length > 0 && currentState != IS_STOPPED){
+    while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
     }
@@ -496,9 +494,8 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     
     // play 
     SDL_PauseAudioDevice(audioDevice, 0);
-    currentState = IS_PLAYING;
     
-    while(audio.length > 0 && currentState != IS_STOPPED){
+    while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
     }
@@ -628,13 +625,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
+                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playAudioProc, audioParams, 0, 0);
+                            
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }else if(currentState == IS_PAUSED){
                             // start up paused audio device again
                             std::cout << "starting where we left off..." << std::endl;
-                            SDL_PauseAudioDevice(currentDeviceID, 0);
                             currentState = IS_PLAYING;
+                            SDL_PauseAudioDevice(currentDeviceID, 0);
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
@@ -677,7 +676,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
+                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, audioParams, 0, 0);
+                            
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
@@ -723,7 +724,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
+                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
+                            
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }else if(currentState == IS_PAUSED){
                             // start up paused audio device again
@@ -1143,11 +1146,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     char sBuf[32];
     sprintf(sBuf, "%p", sdlWnd);
     SDL_SetHint(SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT, sBuf);
-
-    //SDL_SetWindowTitle(sdlWnd, "SDL Window - Set by SDL");
-    //SDL_Surface* s = SDL_GetWindowSurface(sdlWnd);
-    //SDL_FillRect(s, &s->clip_rect, 0xffff00ff);
-    //SDL_UpdateWindowSurface(sdlWnd);
     
     // message loop
     while(GetMessage(&Msg, NULL, 0, 0) > 0){
