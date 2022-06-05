@@ -34,9 +34,6 @@
 // max value for pitch shift
 #define MAX_PITCH_SHIFT 5
 
-// enum for current play state 
-enum PlayState{IS_PLAYING, IS_PAUSED, IS_STOPPED};
-
 // register window 
 const char g_szClassName[] = "mainGUI";
 
@@ -49,9 +46,6 @@ HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARS
       OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
       DEFAULT_PITCH | FF_DONTCARE, TEXT("Tahoma")
 );
-
-// global variable to keep track of playing state?? 
-PlayState currentState = IS_STOPPED;
 
 // keep track of audiodevice id - only keep one around!
 SDL_AudioDeviceID currentDeviceID;
@@ -137,7 +131,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
     AudioData* audio = (AudioData*)userData;
     float* streamF = (float*)stream;
     
-    if(audio->length == 0 || currentState == IS_STOPPED){
+    if(audio->length == 0){
         // stop playing stream here
         return;
     }
@@ -160,21 +154,19 @@ void audioCallback(void* userData, Uint8* stream, int length){
     
     for(int i = 0; i < (int)sampleIndices.size(); i++){
         int sampleIdx = sampleIndices[i];
-
-        if(sampleIdx+1 < length){
-            // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
-            int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
         
-            int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
-        
-            if(scaledVal >= 70){
-                scaledVal = 0;
-            }
-        
-            int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
-        
-            SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
+        // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
+        int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+    
+        int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
+    
+        if(scaledVal >= 70){
+            scaledVal = 0;
         }
+    
+        int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
+    
+        SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
     }
     
     SDL_RenderPresent(sdlRend);
@@ -395,10 +387,15 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     while(audio.length > 0){
         // as long as there's audio data left to play, keep the thread that this code is running in alive with this while loop
         SDL_Delay(10);
+        
+        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+        if(currentState == SDL_AUDIO_STOPPED){
+            std::cout << "audio stopping, breaking out of loop in thread...\n";
+            break;
+        }
     }
     
     // done playing audio. make sure to free stuff.
-    currentState = IS_STOPPED;
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
@@ -445,10 +442,12 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
+        
+        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+        if(currentState == SDL_AUDIO_STOPPED) break;
     }
     
     // done playing audio. make sure to free stuff 
-    currentState = IS_STOPPED;
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
@@ -498,10 +497,12 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
+        
+        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+        if(currentState == SDL_AUDIO_STOPPED) break;
     }
     
     // done playing audio. make sure to free stuff 
-    currentState = IS_STOPPED;
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
@@ -585,9 +586,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
             switch(LOWORD(wParam)){
                 case ID_PLAY_BUTTON:
                     {
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
-                        // play regular audio 
-                        if(currentState == IS_STOPPED){
+                        
+                        if(currentState == SDL_AUDIO_STOPPED){   
                             // get the file first from the text area 
                             HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
                             int textLength = GetWindowTextLength(textbox);
@@ -625,14 +627,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
-                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playAudioProc, audioParams, 0, 0);
                             
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }else if(currentState == IS_PAUSED){
+                        }else if(currentState == SDL_AUDIO_PAUSED){
                             // start up paused audio device again
                             std::cout << "starting where we left off..." << std::endl;
-                            currentState = IS_PLAYING;
                             SDL_PauseAudioDevice(currentDeviceID, 0);
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
@@ -640,7 +640,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     break;
                 case ID_PLAY_KARAOKE_BUTTON:
                     {
-                        if(currentState == IS_STOPPED){
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+                        if(currentState == SDL_AUDIO_STOPPED){
                             // get the file first from the text area 
                             HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
                             int textLength = GetWindowTextLength(textbox);
@@ -676,7 +677,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
-                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, audioParams, 0, 0);
                             
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
@@ -686,7 +686,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                 
                 case ID_PITCH_SHIFT:    
                     {
-                        if(currentState == IS_STOPPED){
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+                        if(currentState == SDL_AUDIO_STOPPED){
                             // get the file first from the text area 
                             HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
                             int textLength = GetWindowTextLength(textbox);
@@ -724,15 +725,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             audioParams->filename = fname;
                             audioParams->sampleRate = sampleRate;
                             
-                            currentState = IS_PLAYING;
                             audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
                             
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }else if(currentState == IS_PAUSED){
+                        }else if(currentState == SDL_AUDIO_PAUSED){
                             // start up paused audio device again
                             std::cout << "starting where we left off..." << std::endl;
                             SDL_PauseAudioDevice(currentDeviceID, 0);
-                            currentState = IS_PLAYING;
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
                         }
                     }
@@ -746,9 +745,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     break;
                 case ID_PAUSE_BUTTON: 
                     {
-                        if(currentState == IS_PLAYING){
-                            currentState = IS_PAUSED;
-                        
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+                        if(currentState == SDL_AUDIO_PLAYING){
                             // halt the audio device callback function 
                             SDL_PauseAudioDevice(currentDeviceID, 1);
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: paused");
@@ -757,13 +755,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     break;
                 case ID_STOP_BUTTON:
                     {
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
-                        if(currentState != IS_STOPPED){
+                        
+                        // TODO: do we really have to check?
+                        if(currentState != SDL_AUDIO_STOPPED){
                             SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
                             SDL_RenderClear(sdlRend);
                             SDL_RenderPresent(sdlRend);
                         
-                            currentState = IS_STOPPED;
                             SDL_CloseAudioDevice(currentDeviceID);
                             
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
