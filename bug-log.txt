@@ -280,3 +280,13 @@ In each thread spawned when we play (assuming current state is STOPPED), we do u
 should we lock them? namely currentDeviceID and currentState. maybe can move currentState update outside of thread control
 and rethink play/pause/stop logic.
 
+111422 - also this when playing pitch-shifted audio to the end:
+Program received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 11804.0x1538]
+0x0040372e in audioCallback (userData=0xe4fe64, stream=0xddd8050 <error reading variable>, length=32768)
+    at wavplayer.cpp:159
+159             int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+(gdb)
+
+this (and the prev segfault) has to do with the "visualization" part, 
+which is definitely not correct anyway so I'm gonna toss it :)

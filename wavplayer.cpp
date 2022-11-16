@@ -143,6 +143,8 @@ void audioCallback(void* userData, Uint8* stream, int length){
         len = audio->length;
     }
     
+    /*** do visualization ***/
+    /*
     int desiredNumPointsToDisplay = 1000; // number of data points to show at a time on the screen
     std::vector<int> sampleIndices = getSampleIndices(length-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
     
@@ -156,6 +158,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
         int sampleIdx = sampleIndices[i];
         
         // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
+        // TODO: check audio->position length first?
         int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
     
         int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
@@ -170,6 +173,9 @@ void audioCallback(void* userData, Uint8* stream, int length){
     }
     
     SDL_RenderPresent(sdlRend);
+    */
+    /*** end visualization ***/
+    
     
     // copy len bytes from audio stream at audio->position to stream buffer
     SDL_memcpy(streamF, audio->position, len);
@@ -180,7 +186,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
 
 // pitch shifting works with Stephan Bernsee's solution, but note that it's slow. just don't think it's broken...
 // use gdb to run it and check
-// Olli Parviainen's SoundTouch works well and seems pretty fast (for my demo sample) but gets slower with larger audio files.
+// Olli Parviainen's SoundTouch works well and seems pretty fast (for my demo sample) but gets slower with larger audio files (which is probably expected?).
 std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::SoundTouch& soundTouch){
     // convert audio data to F32 
     SDL_AudioCVT cvt;
@@ -394,6 +400,10 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
             break;
         }
     }
+    
+    // TODO: stop playing && update UI that state is stopped
+    // need to pass in some extra args
+    // e.g. SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
     
     // done playing audio. make sure to free stuff.
     SDL_CloseAudioDevice(audioDevice);
@@ -758,16 +768,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
                         
-                        // TODO: do we really have to check?
-                        if(currentState != SDL_AUDIO_STOPPED){
-                            SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-                            SDL_RenderClear(sdlRend);
-                            SDL_RenderPresent(sdlRend);
+                        SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+                        SDL_RenderClear(sdlRend);
+                        SDL_RenderPresent(sdlRend);
+                    
+                        SDL_CloseAudioDevice(currentDeviceID);
                         
-                            SDL_CloseAudioDevice(currentDeviceID);
-                            
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
-                        }
+                        SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
                     }
                     break;
                 case ID_SAVE_KARAOKE:
@@ -805,6 +812,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         
                         pitchShiftValue = actualPitchShiftVal;
                         
+                        SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                    }
+                    break;
+                    case TB_ENDTRACK:
+                    {
+                        // on mouse up
+                        HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
+                        DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                        int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
+                        pitchShiftValue = actualPitchShiftVal;
                         SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
                     }
                     break;
