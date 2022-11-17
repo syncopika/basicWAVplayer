@@ -401,11 +401,8 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
         }
     }
     
-    // TODO: stop playing && update UI that state is stopped
-    // need to pass in some extra args
-    // e.g. SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
-    
     // done playing audio. make sure to free stuff.
+    SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
@@ -458,6 +455,7 @@ void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
     }
     
     // done playing audio. make sure to free stuff 
+    SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
@@ -513,6 +511,7 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     }
     
     // done playing audio. make sure to free stuff 
+    SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
     SDL_CloseAudioDevice(audioDevice);
     SDL_FreeWAV(wavStart);
 }
