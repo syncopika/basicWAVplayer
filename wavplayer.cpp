@@ -27,7 +27,7 @@
 #define DEF_SAMPLE_RATE 44100
 
 #define GUI_WIDTH 600
-#define GUI_HEIGHT 450
+#define GUI_HEIGHT 250
 #define VISUALIZER_WINDOW_WIDTH 510
 #define VISUALIZER_WINDOW_HEIGHT 180
 
@@ -54,11 +54,23 @@ SDL_AudioDeviceID currentDeviceID;
 HANDLE audioThread;
 
 // the sdl window and renderer for visualization 
-SDL_Window* sdlWnd;
-SDL_Renderer* sdlRend;
+//SDL_Window* sdlWnd;
+//SDL_Renderer* sdlRend;
 
 // amount to pitch shift
-int pitchShiftValue = 0; //2;
+int pitchShiftValue = 0;
+
+// audio data struct that callback will use
+struct AudioData {
+    Uint8* position;
+    Uint32 length;
+};
+
+// struct to hold filename and sample rate info that can be passed to a thread when playing wav audio 
+struct AudioParams {
+    char* filename;
+    int sampleRate;
+};
 
 // get the name of the file 
 std::string getFilename(std::string file){
@@ -96,25 +108,33 @@ int extractInt(std::string str){
     }
     //std::cout << total << std::endl;
     return total;
-};
+}
 
-// audio data struct that callback will use 
-struct AudioData{
-    Uint8* position;
-    Uint32 length;
-};
+int getCurrentSampleRate(){
+    int sampleRate = 0;
 
-// struct to hold filename and sample rate info that can be passed to a thread when playing wav audio 
-struct AudioParams{
-    char* filename;
-    int sampleRate;
-};
+    HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
+    int textLengthSample = GetWindowTextLength(sampleRateTextBox);
+
+    TCHAR* sampleRateText = new TCHAR[textLengthSample + 1];
+    GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
+
+    // get the sample rate as a string
+    std::string sampleRateString = std::string((char*)sampleRateText);
+
+    // extract the int value from the string
+    sampleRate = extractInt(sampleRateString);
+
+    delete sampleRateText;
+
+    return sampleRate;
+}
 
 int interpolateLength(float newX, float x1, float y1, float x2, float y2){
     return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
 }
 
-// get a vector of the evenly-distributed indices to sample from the dataset based on num samples desired
+/* get a vector of the evenly-distributed indices to sample from the dataset based on num samples desired (for visuzalization)
 // https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
 std::vector<int> getSampleIndices(int dataLen, int numSamples){
     std::vector<int> result;
@@ -124,7 +144,7 @@ std::vector<int> getSampleIndices(int dataLen, int numSamples){
         result.push_back(idx);
     }
     return result;
-}
+}*/
 
 // define an audio callback that SDL_AudioSpec will use
 void audioCallback(void* userData, Uint8* stream, int length){
@@ -142,40 +162,6 @@ void audioCallback(void* userData, Uint8* stream, int length){
     if(len > audio->length){
         len = audio->length;
     }
-    
-    /*** do visualization ***/
-    /*
-    int desiredNumPointsToDisplay = 1000; // number of data points to show at a time on the screen
-    std::vector<int> sampleIndices = getSampleIndices(length-1, desiredNumPointsToDisplay); // subtract 1 to ensure last index is available (should probably check via cout to see what sampleIndices looks like)
-    
-    SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdlRend);
-    SDL_SetRenderDrawColor(sdlRend, 0, 0, 255, SDL_ALPHA_OPAQUE);
-    
-    float audioDataSize = 65536; //255.0; // if 8-bit data, 255. if 16-bit, 65536. etc.
-    
-    for(int i = 0; i < (int)sampleIndices.size(); i++){
-        int sampleIdx = sampleIndices[i];
-        
-        // b/c we want 16-bit int (expecting each audio data point to be 16-bit) and not 8-bit
-        // TODO: check audio->position length first?
-        int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
-    
-        int scaledVal = interpolateLength((float)signalAmp, 0.0, 0.0, audioDataSize, (float)VISUALIZER_WINDOW_HEIGHT/2); // height is divided by 2 because half of the height of the rectangle represents max amplitude since the middle of the rectangle represents 0.
-    
-        if(scaledVal >= 70){
-            scaledVal = 0;
-        }
-    
-        int offset = (VISUALIZER_WINDOW_HEIGHT - scaledVal) / 2;
-    
-        SDL_RenderDrawLine(sdlRend, i, offset, i, offset+scaledVal);
-    }
-    
-    SDL_RenderPresent(sdlRend);
-    */
-    /*** end visualization ***/
-    
     
     // copy len bytes from audio stream at audio->position to stream buffer
     SDL_memcpy(streamF, audio->position, len);
@@ -287,40 +273,17 @@ std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength){
     return modifiedData;
 }
 
-// save file as wav 
-void saveKaraokeWAV(const char* filename){
-    // set up an AudioSpec to load in the file 
-    SDL_AudioSpec wavSpec;
-    Uint8* wavStart;
-    Uint32 wavLength;
-    
-    // load the wav file and some of its properties to the specified variables 
-    if(SDL_LoadWAV(filename, &wavSpec, &wavStart, &wavLength) == NULL){
-        std::cout << "couldn't load wav file" << std::endl;
-        return;
-    }
-    
-    std::vector<float> audioData = convertToKaraoke(wavStart, wavLength);
-    
-    // get string name 
-    std::string file(filename);
-    file = getFilename(file);
-    file = "OFF_VOCAL_" + file + ".wav";
-    std::cout << "saving file as: " << file << std::endl;
-    
-    std::ofstream stream; // create an output file stream 
-    stream.open(file.c_str(), std::ios::binary); 
-    
+void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int nChannels = 2){
     int32_t bufferSize = (int32_t)audioData.size();
     int32_t riffChunkSize = 36 + bufferSize * 2;
     int32_t formatSize = 16;
     int16_t pcm = 1;
-    int16_t numChannels = 1;
-    int32_t sampleRate = DEF_SAMPLE_RATE;
+    int16_t numChannels = nChannels;
+    int32_t sampleRate = DEF_SAMPLE_RATE;     // TODO: pass in sample rate?
     int32_t byteRate = sampleRate * 2; 
-    int16_t bitsPerSample = 16;             // 16-bit pcm wav 
-    int16_t frameSize = numChannels * 2;     // block align
-    int32_t dataChunkSize = bufferSize * 2; // each entry in the buffer is split into 2 int16
+    int16_t bitsPerSample = 16;               // 16-bit pcm wav
+    int16_t frameSize = numChannels * 2;      // block align
+    int32_t dataChunkSize = bufferSize * 2;   // each entry in the buffer is split into 2 int16
     
     stream.write("RIFF", 4);
     stream.write(reinterpret_cast<char *>(&riffChunkSize), sizeof(int32_t));
@@ -346,16 +309,72 @@ void saveKaraokeWAV(const char* filename){
         }
         stream.write(reinterpret_cast<char *>(&m2), sizeof(int16_t));
     }
-    
+}
+
+// save file as wav
+void saveKaraokeWAV(const char* filename){
+    // set up an AudioSpec to load in the file
+    SDL_AudioSpec wavSpec;
+    Uint8* wavStart;
+    Uint32 wavLength;
+
+    // load the wav file and some of its properties to the specified variables
+    if(SDL_LoadWAV(filename, &wavSpec, &wavStart, &wavLength) == NULL){
+        std::cout << "couldn't load wav file" << std::endl;
+        return;
+    }
+
+    std::vector<float> audioData = convertToKaraoke(wavStart, wavLength);
+
+    // get string name
+    std::string file(filename);
+    file = getFilename(file);
+    file = "OFF_VOCAL_" + file + ".wav";
+    std::cout << "saving file as: " << file << std::endl;
+
+    std::ofstream stream; // create an output file stream
+    stream.open(file.c_str(), std::ios::binary);
+
+    writeWavToStream(stream, audioData, 1); // 1 channel
+
     SDL_FreeWAV(wavStart);
 }
 
+void savePitchShiftWAV(const char* filename, int sampleRate = DEF_SAMPLE_RATE){
+    SDL_AudioSpec wavSpec;
+    Uint8* wavStart;
+    Uint32 wavLength;
+
+    // load the wav file and some of its properties to the specified variables
+    if(SDL_LoadWAV(filename, &wavSpec, &wavStart, &wavLength) == NULL){
+        std::cout << "couldn't load wav file" << std::endl;
+        return;
+    }
+
+    soundtouch::SoundTouch soundTouch;
+    soundTouch.setSampleRate(sampleRate);
+    soundTouch.setChannels(2);
+    soundTouch.setPitchSemiTones(pitchShiftValue);
+
+    // pass soundtouch to pitchShift and do the thing
+    std::vector<float> audioData = pitchShift(wavStart, wavLength, soundTouch);
+
+    std::string file(filename);
+    file = getFilename(file);
+    file = "PITCH_SHIFTED_" + std::to_string(pitchShiftValue) + "_" + file + ".wav";
+    std::cout << "saving file as: " << file << std::endl;
+
+    std::ofstream stream;
+    stream.open(file.c_str(), std::ios::binary); 
+
+    writeWavToStream(stream, audioData);
+
+    SDL_FreeWAV(wavStart);
+}
 
 // play wav file regularly 
 void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
-    std::cout << "playing: " << file << std::endl; 
-    SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdlRend);
+    std::cout << "playing: " << file << std::endl;
     
     // set up an AudioSpec to load in the file 
     SDL_AudioSpec wavSpec;
@@ -410,9 +429,6 @@ void playWavAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
 // play wav file with vocal removal 
 // assumes SDL is initialized!
 void playKaraokeAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
-    SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdlRend);
-    
     // set up an AudioSpec to load in the file 
     SDL_AudioSpec wavSpec;
     Uint8* wavStart;
@@ -570,6 +586,21 @@ DWORD WINAPI saveKaraokeAudio(LPVOID lpParam){
     return 0;
 }
 
+// thread function to save pitch shift audio
+DWORD WINAPI savePitchShiftAudio(LPVOID lpParam){
+    AudioParams* audioParams = (AudioParams*)lpParam;
+
+    const char* filename = (char*)(audioParams->filename);
+    int sampleRate = audioParams->sampleRate;
+
+    savePitchShiftWAV(filename, sampleRate);
+
+    delete audioParams->filename;
+    delete audioParams;
+
+    return 0;
+}
+
 void getFile(HWND buttonHandle, HWND textBox){
     OPENFILENAME ofn;
     TCHAR szFile[260] = {0};
@@ -586,6 +617,40 @@ void getFile(HWND buttonHandle, HWND textBox){
     }
 }
 
+void handlePlay(SDL_AudioStatus currentState, DWORD WINAPI(*playFunc)(LPVOID)){
+    if(currentState == SDL_AUDIO_STOPPED){
+        // get the file first from the text area
+        HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+        int textLength = GetWindowTextLength(textbox);
+
+        //https://stackoverflow.com/questions/4545525/pass-charn-param-to-thread
+        // also note that MinGW lets you get away with variable-length arrays but it's not standard
+        TCHAR* filename = new TCHAR[textLength + 1];
+
+        GetWindowText(textbox, filename, textLength + 1);
+
+        // get the sample rate specified
+        // set sample rate to default, which is 44100 if sample rate can't be extracted
+        int sampleRate = getCurrentSampleRate();
+        if(sampleRate == 0) sampleRate = DEF_SAMPLE_RATE;
+
+        // launch a thread to play the audio
+        // pass the thread the params in the AudioParams struct
+        AudioParams* audioParams = new AudioParams();
+        audioParams->filename = (char*)(filename);
+        audioParams->sampleRate = sampleRate;
+
+        audioThread = CreateThread(NULL, 0, playFunc, audioParams, 0, 0);
+
+        SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
+    }else if(currentState == SDL_AUDIO_PAUSED){
+        // start up paused audio device again
+        std::cout << "starting where we left off..." << std::endl;
+        SDL_PauseAudioDevice(currentDeviceID, 0);
+        SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
+    }
+}
+
 
 // procedure for main window 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
@@ -597,152 +662,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
-                        
-                        if(currentState == SDL_AUDIO_STOPPED){   
-                            // get the file first from the text area 
-                            HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
-                            int textLength = GetWindowTextLength(textbox);
-                            
-                            //https://stackoverflow.com/questions/4545525/pass-charn-param-to-thread
-                            TCHAR* filename = new TCHAR[textLength + 1]();
-                            
-                            GetWindowText(textbox, filename, textLength + 1);
-                            
-                            // get the sample rate specified 
-                            // set sample rate to default, which is 44100 if sample rate can't be extracted 
-                            int sampleRate = 0;
-                                
-                            HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
-                            int textLengthSample = GetWindowTextLength(sampleRateTextBox);
-                                
-                            TCHAR sampleRateText[textLengthSample + 1];
-                            GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
-                                
-                            // get the sample rate as a string
-                            std::string sampleRateString = std::string((char*)sampleRateText);
-                            
-                            // extract the int value from the string 
-                            sampleRate = extractInt(sampleRateString);
-                            
-                            if(sampleRate == 0){
-                                sampleRate = DEF_SAMPLE_RATE;
-                            }
-                        
-                            // launch a thread to play the audio 
-                            // pass the thread the params in the AudioParams struct  
-                            char* fname = (char*)(filename);
-                            
-                            AudioParams* audioParams = new AudioParams();
-                            audioParams->filename = fname;
-                            audioParams->sampleRate = sampleRate;
-                            
-                            audioThread = CreateThread(NULL, 0, playAudioProc, audioParams, 0, 0);
-                            
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }else if(currentState == SDL_AUDIO_PAUSED){
-                            // start up paused audio device again
-                            std::cout << "starting where we left off..." << std::endl;
-                            SDL_PauseAudioDevice(currentDeviceID, 0);
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }
+                        handlePlay(currentState, playAudioProc);
                     }
                     break;
                 case ID_PLAY_KARAOKE_BUTTON:
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
-                        if(currentState == SDL_AUDIO_STOPPED){
-                            // get the file first from the text area 
-                            HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
-                            int textLength = GetWindowTextLength(textbox);
-                            
-                            TCHAR* filename = new TCHAR[textLength + 1]();
-                            
-                            GetWindowText(textbox, filename, textLength + 1);
-                            
-                            // get the sample rate specified 
-                            int sampleRate = 0;
-                                
-                            HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
-                            int textLengthSample = GetWindowTextLength(sampleRateTextBox);
-                                
-                            TCHAR sampleRateText[textLengthSample+1];
-                            GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
-                                
-                            // get the sample rate as a string
-                            std::string sampleRateString = std::string((char*)sampleRateText);
-                            
-                            // extract the int value from the string 
-                            sampleRate = extractInt(sampleRateString);
-                            
-                            if(sampleRate == 0){
-                                sampleRate = DEF_SAMPLE_RATE;
-                            }
-                        
-                            // launch a thread to play the audio 
-                            // pass the thread the params in the AudioParams struct  
-                            char* fname = (char*)(filename);
-                            
-                            AudioParams* audioParams = new AudioParams();
-                            audioParams->filename = fname;
-                            audioParams->sampleRate = sampleRate;
-                            
-                            audioThread = CreateThread(NULL, 0, playKaraokeAudioProc, audioParams, 0, 0);
-                            
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }
+                        handlePlay(currentState, playKaraokeAudioProc);
                     }
                     break;
                 
                 case ID_PITCH_SHIFT:    
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
-                        if(currentState == SDL_AUDIO_STOPPED){
-                            // get the file first from the text area 
-                            HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
-                            int textLength = GetWindowTextLength(textbox);
-                            
-                            TCHAR* filename = new TCHAR[textLength + 1]();
-                            
-                            GetWindowText(textbox, filename, textLength + 1);
-                            
-                            // get the sample rate specified 
-                            // set sample rate to default, which is 44100 if sample rate can't be extracted 
-                            int sampleRate = 0;
-                                
-                            HWND sampleRateTextBox = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
-                            int textLengthSample = GetWindowTextLength(sampleRateTextBox);
-                                
-                            TCHAR sampleRateText[textLengthSample+1];
-                            GetWindowText(sampleRateTextBox, sampleRateText, textLengthSample + 1);
-                                
-                            // get the sample rate as a string
-                            std::string sampleRateString = std::string((char*)sampleRateText);
-                            //std::cout << sampleRateString << std::endl;
-                            
-                            // extract the int value from the string 
-                            sampleRate = extractInt(sampleRateString);
-                            
-                            if(sampleRate == 0){
-                                sampleRate = DEF_SAMPLE_RATE;
-                            }
-                        
-                            // launch a thread to play the audio 
-                            // pass the thread the params in the AudioParams struct  
-                            char* fname = (char*)(filename);
-                            
-                            AudioParams* audioParams = new AudioParams();
-                            audioParams->filename = fname;
-                            audioParams->sampleRate = sampleRate;
-                            
-                            audioThread = CreateThread(NULL, 0, playPitchShiftedAudioProc, audioParams, 0, 0);
-                            
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }else if(currentState == SDL_AUDIO_PAUSED){
-                            // start up paused audio device again
-                            std::cout << "starting where we left off..." << std::endl;
-                            SDL_PauseAudioDevice(currentDeviceID, 0);
-                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
-                        }
+                        handlePlay(currentState, playPitchShiftedAudioProc);
                     }
                     break;
                 case ID_FILE_DIALOG:
@@ -756,7 +689,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         if(currentState == SDL_AUDIO_PLAYING){
-                            // halt the audio device callback function 
                             SDL_PauseAudioDevice(currentDeviceID, 1);
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: paused");
                         }
@@ -766,13 +698,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
-                        
-                        SDL_SetRenderDrawColor(sdlRend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-                        SDL_RenderClear(sdlRend);
-                        SDL_RenderPresent(sdlRend);
-                    
                         SDL_CloseAudioDevice(currentDeviceID);
-                        
                         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
                     }
                     break;
@@ -780,16 +706,33 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     {
                         HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
                         int textLength = GetWindowTextLength(textbox);
-                        TCHAR filename[textLength + 1];
+                        TCHAR* filename = new TCHAR[textLength + 1];
                         GetWindowText(textbox, filename, textLength + 1);
-                        char* fname = (char*)(filename);
                         
                         // https://stackoverflow.com/questions/40500616/c-11-stdthread-use-ofstream-output-stuff-but-get-nothing-why
                         // https://stackoverflow.com/questions/11779504/join-equivalent-in-windows
-                        HANDLE saveThread = CreateThread(NULL, 0, saveKaraokeAudio, fname, 0, 0);
+                        HANDLE saveThread = CreateThread(NULL, 0, saveKaraokeAudio, (char*)(filename), 0, 0);
                         
                         // need to wait for this thread to finish!
                         // otherwise this iteration of the message loop will be done right away and the thread dies prematurely 
+                        WaitForSingleObject(saveThread, INFINITE);
+                    }
+                    break;
+                case ID_SAVE_PITCHSHIFT:
+                    {
+                        HWND textbox = GetDlgItem(hwnd, ID_ADDWAVPATH);
+                        int textLength = GetWindowTextLength(textbox);
+                        TCHAR* filename = new TCHAR[textLength + 1];
+                        GetWindowText(textbox, filename, textLength + 1);
+
+                        int sampleRate = getCurrentSampleRate();
+                        if(sampleRate == 0) sampleRate = DEF_SAMPLE_RATE;
+
+                        AudioParams* audioParams = new AudioParams();
+                        audioParams->filename = (char*)(filename);
+                        audioParams->sampleRate = sampleRate;
+
+                        HANDLE saveThread = CreateThread(NULL, 0, savePitchShiftAudio, audioParams, 0, 0);
                         WaitForSingleObject(saveThread, INFINITE);
                     }
                     break;
@@ -957,7 +900,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("specify WAV file: "),
         WS_VISIBLE | WS_CHILD, 
         50, 30, // x, y
-        100, 20, // width, height 
+        100, 20, // width, height
         hwnd,
         (HMENU)ID_ADDWAVPATH_LABEL,
         hInstance,
@@ -970,7 +913,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("edit"),
         TEXT(""),
         WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL, 
-        150, 30, 
+        150, 30,
         250, 20,
         hwnd,
         (HMENU)ID_ADDWAVPATH,
@@ -984,8 +927,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("button"),
         TEXT("find file"),
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        420, 30, 
-        100, 20, 
+        420, 30,
+        100, 20,
         hwnd,
         (HMENU)ID_FILE_DIALOG,
         hInstance,
@@ -998,8 +941,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("STATIC"),
         TEXT("specify sample rate: "),
         WS_VISIBLE | WS_CHILD,
-        50, 80, 
-        130, 20, 
+        50, 80,
+        130, 20,
         hwnd,
         (HMENU)ID_SPECIFY_SAMPLE_RATE_LABEL,
         hInstance,
@@ -1011,8 +954,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("edit"),
         TEXT("44100"),
         WS_VISIBLE | WS_CHILD | WS_BORDER,
-        170, 80, 
-        70, 20, 
+        170, 80,
+        70, 20,
         hwnd,
         (HMENU)ID_SPECIFY_SAMPLE_RATE,
         hInstance,
@@ -1070,8 +1013,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("button"),
         TEXT("play"),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        30, 150,
-        80, 20, 
+        25, 150,
+        60, 20,
         hwnd,
         (HMENU)ID_PLAY_BUTTON,
         hInstance,
@@ -1082,10 +1025,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // make a button to play karaoke version 
     HWND playKaraokeButton = CreateWindow(
         TEXT("button"),
-        TEXT("play karaoke ver."),
+        TEXT("play karaoke"),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        120, 150,
-        120, 20, 
+        90, 150,
+        100, 20,
         hwnd,
         (HMENU)ID_PLAY_KARAOKE_BUTTON,
         hInstance,
@@ -1098,8 +1041,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("button"),
         TEXT("pause"),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        250, 150,
-        80, 20, 
+        195, 150,
+        60, 20,
         hwnd,
         (HMENU)ID_PAUSE_BUTTON,
         hInstance,
@@ -1112,8 +1055,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("button"),
         TEXT("stop"),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        340, 150,
-        80, 20, 
+        260, 150,
+        60, 20,
         hwnd,
         (HMENU)ID_STOP_BUTTON,
         hInstance,
@@ -1124,10 +1067,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // make a button to save karaoke audio 
     HWND saveKaraokeButton = CreateWindow(
         TEXT("button"),
-        TEXT("save karaoke ver."),
+        TEXT("save karaoke"),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        430, 150,
-        120, 20, 
+        325, 150,
+        100, 20,
         hwnd,
         (HMENU)ID_SAVE_KARAOKE,
         hInstance,
@@ -1135,33 +1078,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
     SendMessage(saveKaraokeButton, WM_SETFONT, (WPARAM)hFont, true);
     
-    // child window to visualize audio (wow!)
-    HWND audioVisualizerWindow = CreateWindow(
-        TEXT("STATIC"),
-        NULL,
-        WS_CHILD | WS_VISIBLE | WS_BORDER,
-        30, 200,
-        VISUALIZER_WINDOW_WIDTH, VISUALIZER_WINDOW_HEIGHT, 
+    // make a button to save pitch shifted audio
+    HWND savePitchShiftButton = CreateWindow(
+        TEXT("button"),
+        TEXT("save pitch shift"),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        430, 150,
+        130, 20,
         hwnd,
-        (HMENU)ID_AUDIO_VISUALIZER,
+        (HMENU)ID_SAVE_PITCHSHIFT,
         hInstance,
         NULL
     );
-    SendMessage(audioVisualizerWindow, WM_SETFONT, (WPARAM)hFont, true);
+    SendMessage(savePitchShiftButton, WM_SETFONT, (WPARAM)hFont, true);
     
     // display the gui 
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
-    
-    // make the audio visualizer child window an SDL window!
-    SDL_InitSubSystem(SDL_INIT_VIDEO);
-    
-    sdlWnd = SDL_CreateWindowFrom(audioVisualizerWindow);
-    sdlRend = SDL_CreateRenderer(sdlWnd, -1, SDL_RENDERER_ACCELERATED);
-    
-    char sBuf[32];
-    sprintf(sBuf, "%p", sdlWnd);
-    SDL_SetHint(SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT, sBuf);
     
     // message loop
     while(GetMessage(&Msg, NULL, 0, 0) > 0){
