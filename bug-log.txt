@@ -54,3 +54,239 @@ Thread 16 received signal SIGSEGV, Segmentation fault.
 
 
 problem was that the wrong numbers were being used with SoundTouch's sendSamples() and receiveSamples()
+
+
+06/04/22 - heap mem issue
+C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer>gdb wavplayer.exe
+GNU gdb (GDB) 8.1
+Copyright (C) 2018 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "i686-w64-mingw32".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from wavplayer.exe...done.
+(gdb) run
+Starting program: C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer\wavplayer.exe
+[New Thread 12536.0x2b24]
+[New Thread 12536.0x918]
+[New Thread 12536.0x2420]
+[New Thread 12536.0x20a4]
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(1) tid(2b24) 800401F0 CoInitialize has not been called.
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(2) tid(2b24) 800401F0 CoInitialize has not been called.
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(3) tid(2b24) 800401F0 CoInitialize has not been called.
+[New Thread 12536.0x2d20]
+[New Thread 12536.0x2ca4]
+[New Thread 12536.0x2f4c]
+[New Thread 12536.0x234c]
+[New Thread 12536.0x1ab4]
+[New Thread 12536.0x17b8]
+[New Thread 12536.0xe2c]
+[New Thread 12536.0x2d90]
+[New Thread 12536.0xb1c]
+[New Thread 12536.0xd70]
+[New Thread 12536.0x1bb8]
+[New Thread 12536.0x190c]
+[Thread 12536.0x190c exited with code 0]
+[New Thread 12536.0x1c5c]
+[New Thread 12536.0x2370]
+[New Thread 12536.0x3bc]
+[New Thread 12536.0x1e30]
+[New Thread 12536.0x2394]
+[New Thread 12536.0x1900]
+warning: onecore\com\combase\dcomrem\security.cxx(3071)\combase.dll!76FE6AFD: (caller: 67437E3A) ReturnHr(4) tid(1900) 80010117 Call context cannot be accessed after call completed.
+[New Thread 12536.0x3584]
+[New Thread 12536.0x1fec]
+[Thread 12536.0x1fec exited with code 0]
+[Thread 12536.0x3584 exited with code 0]
+[Thread 12536.0xd70 exited with code 0]
+[Thread 12536.0x918 exited with code 0]
+[Thread 12536.0x2420 exited with code 0]
+[Thread 12536.0x20a4 exited with code 0]
+[Thread 12536.0x2d90 exited with code 0]
+[Thread 12536.0xe2c exited with code 0]
+[Thread 12536.0x2ca4 exited with code 0]
+[Thread 12536.0x234c exited with code 0]
+[Thread 12536.0x2f4c exited with code 0]
+[Thread 12536.0x1ab4 exited with code 0]
+[New Thread 12536.0x244c]
+[New Thread 12536.0x2b3c]
+[New Thread 12536.0x1810]
+[New Thread 12536.0x2b58]
+[New Thread 12536.0x26ac]
+[New Thread 12536.0x26b4]
+[New Thread 12536.0x292c]
+[New Thread 12536.0x27f4]
+[New Thread 12536.0x2f4]
+[New Thread 12536.0xcbc]
+[New Thread 12536.0x3458]
+[Thread 12536.0x26ac exited with code 0]
+[Thread 12536.0x3458 exited with code 0]
+[Thread 12536.0x2b3c exited with code 0]
+[Thread 12536.0x2b58 exited with code 0]
+[New Thread 12536.0x10f8]
+[New Thread 12536.0x2bbc]
+[New Thread 12536.0x1eb8]
+[New Thread 12536.0x37b4]
+[New Thread 12536.0x1ec4]
+[Thread 12536.0x37b4 exited with code 0]
+[Thread 12536.0x1ec4 exited with code 0]
+[Thread 12536.0x2bbc exited with code 0]
+[Thread 12536.0x1eb8 exited with code 0]
+[New Thread 12536.0x328c]
+[New Thread 12536.0x319c]
+[New Thread 12536.0x3710]
+[New Thread 12536.0x2508]
+[New Thread 12536.0x2790]
+[Thread 12536.0x2508 exited with code 0]
+[Thread 12536.0x2790 exited with code 0]
+[Thread 12536.0x319c exited with code 0]
+[Thread 12536.0x3710 exited with code 0]
+[New Thread 12536.0x10a4]
+[New Thread 12536.0x2540]
+[New Thread 12536.0xbc8]
+[New Thread 12536.0x1e90]
+[New Thread 12536.0xc40]
+[New Thread 12536.0x2178]
+[New Thread 12536.0x22fc]
+[Thread 12536.0x1e90 exited with code 0]
+[Thread 12536.0xc40 exited with code 0]
+[Thread 12536.0x2540 exited with code 0]
+[Thread 12536.0xbc8 exited with code 0]
+[New Thread 12536.0x1aa8]
+[New Thread 12536.0x24a4]
+[New Thread 12536.0xb80]
+[New Thread 12536.0x108]
+[New Thread 12536.0x1a20]
+[Thread 12536.0x292c exited with code 0]
+[Thread 12536.0x26b4 exited with code 0]
+[Thread 12536.0x27f4 exited with code 0]
+warning: HEAP[wavplayer.exe]:
+warning: HEAP: Free Heap block 0D6132A8 modified at 0D6132F0 after it was freed
+
+Thread 1 received signal SIGTRAP, Trace/breakpoint trap.
+0x77c342da in ntdll!RtlGetCurrentServiceSessionId () from C:\WINDOWS\SYSTEM32\ntdll.dll
+(gdb)
+
+--------- segmentation fault in thread
+C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer>gdb wavplayer.exe
+GNU gdb (GDB) 8.1
+Copyright (C) 2018 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "i686-w64-mingw32".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from wavplayer.exe...done.
+(gdb) run
+Starting program: C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer\wavplayer.exe
+[New Thread 604.0x2a98]
+[New Thread 604.0x207c]
+[New Thread 604.0x15f8]
+[New Thread 604.0x1f2c]
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(1) tid(2a98) 800401F0 CoInitialize has not been called.
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(2) tid(2a98) 800401F0 CoInitialize has not been called.
+warning: onecore\com\combase\objact\objact.cxx(827)\combase.dll!77009E86: (caller: 77008E3B) ReturnHr(3) tid(2a98) 800401F0 CoInitialize has not been called.
+[New Thread 604.0x2bcc]
+[New Thread 604.0x3674]
+[New Thread 604.0x2910]
+[New Thread 604.0x2cd0]
+[New Thread 604.0x107c]
+[New Thread 604.0x1c10]
+[New Thread 604.0x2434]
+[New Thread 604.0x3474]
+[New Thread 604.0xc6c]
+[New Thread 604.0x1fe8]
+[New Thread 604.0x23e4]
+[New Thread 604.0x33a0]
+[Thread 604.0x33a0 exited with code 0]
+[New Thread 604.0x370]
+[New Thread 604.0xf38]
+[New Thread 604.0x2c30]
+[New Thread 604.0x2aa8]
+[New Thread 604.0x1634]
+[New Thread 604.0x351c]
+[New Thread 604.0x1c58]
+warning: onecore\com\combase\dcomrem\security.cxx(3071)\combase.dll!76FE6AFD: (caller: 67327E3A) ReturnHr(4) tid(1c58) 80010117 Call context cannot be accessed after call completed.
+[New Thread 604.0x2120]
+[New Thread 604.0x1e8]
+[Thread 604.0x1e8 exited with code 0]
+[New Thread 604.0x32ec]
+[New Thread 604.0x27c8]
+[Thread 604.0x27c8 exited with code 1]
+[Thread 604.0x107c exited with code 0]
+[New Thread 604.0x344]
+[New Thread 604.0x3288]
+[New Thread 604.0x19bc]
+[New Thread 604.0x28c4]
+[New Thread 604.0x34d4]
+[Thread 604.0x28c4 exited with code 0]
+[Thread 604.0x34d4 exited with code 0]
+[Thread 604.0x3288 exited with code 0]
+[Thread 604.0x19bc exited with code 0]
+[New Thread 604.0x1e60]
+[New Thread 604.0x8fc]
+[New Thread 604.0x1274]
+[New Thread 604.0x34b4]
+[New Thread 604.0x35f8]
+[Thread 604.0x34b4 exited with code 0]
+[Thread 604.0x35f8 exited with code 0]
+[Thread 604.0x8fc exited with code 0]
+[Thread 604.0x1274 exited with code 0]
+[New Thread 604.0x2618]
+[New Thread 604.0x25f4]
+[New Thread 604.0x23f8]
+[New Thread 604.0x1300]
+[New Thread 604.0x327c]
+[New Thread 604.0x3030]
+[New Thread 604.0x2d08]
+[Thread 604.0x3674 exited with code 0]
+[Thread 604.0x2cd0 exited with code 0]
+[Thread 604.0x2910 exited with code 0]
+
+Thread 42 received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 604.0x327c]
+0x6d40746f in d3d9!Direct3DCreate9 () from C:\WINDOWS\SysWOW64\d3d9.dll
+(gdb) bt
+#0  0x6d40746f in d3d9!Direct3DCreate9 () from C:\WINDOWS\SysWOW64\d3d9.dll
+#1  0x6c779b0e in SDL_LogCritical ()
+   from C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer\SDL2.dll
+#2  0x00958d80 in ?? ()
+#3  0x6c77aa19 in SDL_LogCritical ()
+   from C:\Users\Nicholas Hung\Desktop\my_projects\basicWAVplayer\SDL2.dll
+#4  0x00000000 in ?? ()
+
+------- another seg fault :(
+Thread 57 received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 14096.0x264c]
+audioCallback (userData=0x1176fed8, stream=0x117cc050 "", length=16384) at wavplayer.cpp:165
+165             int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+
+In each thread spawned when we play (assuming current state is STOPPED), we do update some global variables.
+should we lock them? namely currentDeviceID and currentState. maybe can move currentState update outside of thread control
+and rethink play/pause/stop logic.
+
+111422 - also this when playing pitch-shifted audio to the end:
+Program received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 11804.0x1538]
+0x0040372e in audioCallback (userData=0xe4fe64, stream=0xddd8050 <error reading variable>, length=32768)
+    at wavplayer.cpp:159
+159             int signalAmp = (audio->position[sampleIdx+1] << 8 | audio->position[sampleIdx]);
+(gdb)
+
+this (and the prev segfault) has to do with the "visualization" part, 
+which is definitely not correct anyway so I'm gonna toss it :)

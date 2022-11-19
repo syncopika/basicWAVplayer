@@ -20,7 +20,7 @@ CXXFLAGS = -g -Wall -Wformat -O2 -c -std=c++14 $(SDL_INCLUDE) -I$(SNDTOUCH_DIR)
 LDFLAGS = -lmingw32 -mwindows -static-libstdc++ -static-libgcc $(SDL_LIB)
 
 # object files needed 
-OBJS = wavplayer.o
+OBJS = wavplayer.o resources.o
 
 # add the soundtouch obj files
 SNDTOUCH_SRC = $(wildcard $(SNDTOUCH_DIR)/*.cpp)
@@ -32,6 +32,11 @@ EXE = wavplayer
 
 #$(info OBJS is $(OBJS))
 all: $(EXE)
+
+# compile the resource file with windres 
+# the compiled rc file will have a .o extension 
+resources.o: resources.rc
+	windres resources.rc -o resources.o 
 
 # build instruction set stuff first
 mmx_optimized.o: $(MMX)
