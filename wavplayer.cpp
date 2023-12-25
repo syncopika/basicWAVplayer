@@ -23,6 +23,9 @@
 // pitch shifting code by Stephan Bernsee 
 //#include "smbPitchShift.h"
 
+// filters from @vfiksdal (https://github.com/vfiksdal/rtfir/tree/main)
+#include "filters/rtfir.hpp"
+
 // default sample rate 
 #define DEF_SAMPLE_RATE 44100
 
@@ -125,7 +128,7 @@ int getCurrentSampleRate(){
     // extract the int value from the string
     sampleRate = extractInt(sampleRateString);
 
-    delete sampleRateText;
+    delete[] sampleRateText;
 
     return sampleRate;
 }
@@ -265,6 +268,41 @@ std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength){
     for(int j = 0; j < (int)leftChannel.size(); j++){
         float temp = (leftChannel[j] - rightChannel[j]) / 2.0;
         modifiedData.push_back(temp);
+    }
+    
+    // make sure to free allocated space!
+    SDL_free(cvt.buf);
+    
+    return modifiedData;
+}
+
+// for filtering audio
+std::vector<float> filterAudio(Uint8* wavStart, Uint32 wavLength){
+    // convert audio data to F32 
+    SDL_AudioCVT cvt;
+    SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
+    cvt.len = wavLength;
+    cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
+    
+    // copy current audio data to the buffer (dest, src, len)
+    SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
+    SDL_ConvertAudio(&cvt);
+    
+    // audio data is now in float form!
+    float* newData = (float *)cvt.buf;
+    
+    int floatBufLen = (int)cvt.len_cvt / 4; // 4 bytes per float
+
+    std::vector<float> modifiedData(floatBufLen);
+    
+    // do the filtering
+    double cutoff = 1000;
+    int taps = 100;
+    
+    RTFIR_lowpass lowpassFilter(taps, cutoff/(double)DEF_SAMPLE_RATE);
+    
+    for(int i = 0; i < floatBufLen; i++){
+      modifiedData[i] = (float)(lowpassFilter.Filter((double)newData[i]));
     }
     
     // make sure to free allocated space!
@@ -532,6 +570,52 @@ void playPitchShiftedAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RA
     SDL_FreeWAV(wavStart);
 }
 
+void playFilteredAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE){
+    // set up an AudioSpec to load in the file 
+    SDL_AudioSpec wavSpec;
+    Uint8* wavStart;
+    Uint32 wavLength;
+    
+    // load the wav file and some of its properties to the specified variables 
+    if(SDL_LoadWAV(file.c_str(), &wavSpec, &wavStart, &wavLength) == NULL){
+        std::cout << "couldn't load wav file" << std::endl;
+        return;
+    }
+    
+    // filter audio e.g. lowpass, highpass, etc.
+    std::vector<float> modifiedData = filterAudio(wavStart, wavLength);
+    
+    AudioData audio;
+    audio.position = (Uint8*)modifiedData.data(); 
+    audio.length = (Uint32)(modifiedData.size() * sizeof(float));
+    
+    // update the audio spec
+    wavSpec.freq = sampleRate;
+    wavSpec.format = AUDIO_F32;
+    wavSpec.channels = 2;
+    wavSpec.callback = audioCallback;
+    wavSpec.userdata = &audio; // attach modified audio data to audio spec 
+    
+    SDL_AudioDeviceID audioDevice;
+    audioDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, 0);
+    currentDeviceID = audioDevice;
+    
+    // play 
+    SDL_PauseAudioDevice(audioDevice, 0);
+    
+    while(audio.length > 0){
+        // keep thread alive
+        SDL_Delay(10);
+        
+        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+        if(currentState == SDL_AUDIO_STOPPED) break;
+    }
+    
+    // done playing audio. make sure to free stuff 
+    SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
+    SDL_CloseAudioDevice(audioDevice);
+    SDL_FreeWAV(wavStart);
+}
 
 
 // thread function to play audio 
@@ -573,6 +657,21 @@ DWORD WINAPI playPitchShiftedAudioProc(LPVOID lpParam){
     int sampleRate = audioParams->sampleRate;
     
     playPitchShiftedAudio(filename, sampleRate);
+    
+    delete audioParams->filename;
+    delete audioParams;
+    
+    return 0;
+}
+
+// thread function to play filtered audio
+DWORD WINAPI playFilteredAudioProc(LPVOID lpParam){
+    AudioParams* audioParams = (AudioParams*)lpParam;
+    
+    std::string filename = std::string((char*)(audioParams->filename));
+    int sampleRate = audioParams->sampleRate;
+    
+    playFilteredAudio(filename, sampleRate);
     
     delete audioParams->filename;
     delete audioParams;
@@ -671,7 +770,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         handlePlay(currentState, playKaraokeAudioProc);
                     }
                     break;
-                
+                case ID_PLAY_FILTERED_BUTTON:
+                    {
+                        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+                        handlePlay(currentState, playFilteredAudioProc);
+                    }
+                    break;
                 case ID_PITCH_SHIFT:    
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
@@ -1021,6 +1125,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         NULL
     );
     SendMessage(playButton, WM_SETFONT, (WPARAM)hFont, true);
+    
+    // make a button to play filtered audio
+    HWND playFilteredButton = CreateWindow(
+        TEXT("button"),
+        TEXT("play filtered"),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        25, 180,
+        90, 20,
+        hwnd,
+        (HMENU)ID_PLAY_FILTERED_BUTTON,
+        hInstance,
+        NULL
+    );
+    SendMessage(playFilteredButton, WM_SETFONT, (WPARAM)hFont, true);
     
     // make a button to play karaoke version 
     HWND playKaraokeButton = CreateWindow(
