@@ -65,5 +65,11 @@ https://stackoverflow.com/questions/8154084/how-to-extract-frequency-out-of-wav-
 https://subscription.packtpub.com/book/game_development/9781849699099/1/ch01lvl1sec09/analog-and-digital-audio
 https://gist.github.com/endolith/e8597a58bcd11a6462f33fa8eb75c43d
 
+// audio filters
+https://github.com/vfiksdal/rtfir
+https://stackoverflow.com/questions/7062671/can-someone-here-has-a-sample-of-high-pass-filter-for-pcm-audio-data
+https://www.reddit.com/r/Logic_Studio/comments/1ptt64/how_can_i_best_simulate_voice_as_if_it_were_over/
+https://dsp.stackexchange.com/questions/31066/how-many-taps-does-an-fir-filter-need
+
 // misc
 https://wiki.gentoo.org/wiki/GCC_optimization#-msse.2C_-msse2.2C_-msse3.2C_-mmmx.2C_-m3dnow
