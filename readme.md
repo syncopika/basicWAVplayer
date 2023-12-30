@@ -1,4 +1,4 @@
-A WAV player that has basic functionality such as play, stop, and pause as well as rudimentary vocal removal and pitch shifting.      
+A WAV player that has basic functionality such as play, stop, and pause as well as rudimentary vocal removal, pitch shifting and high/lowpass filtering.      
     
 ![basic wav player screenshot](screenshot.png "basic wav player")    
     
