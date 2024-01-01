@@ -69,7 +69,7 @@ struct AudioData {
 // struct to hold filename and sample rate info that can be passed to a thread when playing wav audio 
 struct AudioParams {
     char* filename=NULL;
-    int sampleRate;
+    int sampleRate; // desired sample rate by user
     int pitchShiftAmount;
     bool karaokeOn;
     bool lowpassFilterOn;
@@ -113,7 +113,7 @@ int extractInt(std::string str){
             place *= 10;
         }
     }
-    //std::cout << total << std::endl;
+    
     return total;
 }
 
@@ -178,14 +178,22 @@ void audioCallback(void* userData, Uint8* stream, int length){
 // pitch shifting works with Stephan Bernsee's solution, but note that it's slow. just don't think it's broken...
 // use gdb to run it and check
 // Olli Parviainen's SoundTouch works well and seems pretty fast (for my demo sample) but gets slower with larger audio files (which is probably expected?).
-std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::SoundTouch& soundTouch, bool convertToFloat){
+std::vector<float> pitchShift(
+    Uint8* wavStart, 
+    Uint32 wavLength, 
+    soundtouch::SoundTouch& soundTouch, 
+    SDL_AudioFormat srcFormat,
+    int srcSampleRate, 
+    int desiredSampleRate, 
+    bool convertToFloat
+){
     float* newData = (float*)wavStart;
     int floatBufLen = (int)wavLength;
     SDL_AudioCVT cvt;
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
+      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, desiredSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -239,7 +247,14 @@ std::vector<float> pitchShift(Uint8* wavStart, Uint32 wavLength, soundtouch::Sou
 
 // convert data to 32-bit float karaoke audio for 1 channel 
 // need to pass it the data and the length of the data 
-std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength, bool convertToFloat){
+std::vector<float> convertToKaraoke(
+    Uint8* wavStart, 
+    Uint32 wavLength, 
+    SDL_AudioFormat srcFormat,
+    int srcSampleRate, 
+    int desiredSampleRate, 
+    bool convertToFloat
+){
     float* newData = (float*)wavStart;
     int floatBufLen = (int)wavLength;
     SDL_AudioCVT cvt;
@@ -249,7 +264,7 @@ std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength, bool conv
     
     if(convertToFloat){
       // convert audio data to F32
-      SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
+      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -287,14 +302,22 @@ std::vector<float> convertToKaraoke(Uint8* wavStart, Uint32 wavLength, bool conv
 }
 
 // lowpass filter
-std::vector<float> lowpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cutoffVal, bool convertToFloat){
+std::vector<float> lowpassFilterAudio(
+    Uint8* wavStart, 
+    Uint32 wavLength, 
+    int cutoffVal, 
+    SDL_AudioFormat srcFormat,
+    int srcSampleRate, 
+    int desiredSampleRate, 
+    bool convertToFloat
+){
     float* newData = (float*)wavStart;
     int floatBufLen = (int)wavLength;
     SDL_AudioCVT cvt;
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
+      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -315,7 +338,7 @@ std::vector<float> lowpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cut
     double cutoff = (double)cutoffVal; //1000;
     int taps = 100;
     
-    RTFIR_lowpass lowpassFilter(taps, cutoff/(double)DEF_SAMPLE_RATE);
+    RTFIR_lowpass lowpassFilter(taps, cutoff / (double)desiredSampleRate);
     
     for(int i = 0; i < floatBufLen; i++){
       modifiedData[i] = (float)(lowpassFilter.Filter((double)newData[i]));
@@ -328,14 +351,22 @@ std::vector<float> lowpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cut
 }
 
 // highpass filter
-std::vector<float> highpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cutoffVal, bool convertToFloat){
+std::vector<float> highpassFilterAudio(
+    Uint8* wavStart, 
+    Uint32 wavLength, 
+    int cutoffVal, 
+    SDL_AudioFormat srcFormat,
+    int srcSampleRate, 
+    int desiredSampleRate, 
+    bool convertToFloat
+){
     float* newData = (float*)wavStart;
     int floatBufLen = (int)wavLength;
     SDL_AudioCVT cvt;
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, AUDIO_S16, 2, DEF_SAMPLE_RATE, AUDIO_F32, 2, DEF_SAMPLE_RATE);
+      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -355,7 +386,7 @@ std::vector<float> highpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cu
     double cutoff = (double)cutoffVal; //1000;
     int taps = 100;
     
-    RTFIR_highpass highpassFilter(taps, cutoff/(double)DEF_SAMPLE_RATE);
+    RTFIR_highpass highpassFilter(taps, cutoff / (double)desiredSampleRate);
     
     for(int i = 0; i < floatBufLen; i++){
       modifiedData[i] = (float)(highpassFilter.Filter((double)newData[i]));
@@ -367,14 +398,14 @@ std::vector<float> highpassFilterAudio(Uint8* wavStart, Uint32 wavLength, int cu
     return modifiedData;
 }
 
-void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int nChannels = 2){
+void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int desiredSampleRate, int nChannels = 2){
     int32_t bufferSize = (int32_t)audioData.size();
     int32_t riffChunkSize = 36 + bufferSize * 2;
     int32_t formatSize = 16;
     int16_t pcm = 1;
     int16_t numChannels = nChannels;
-    int32_t sampleRate = DEF_SAMPLE_RATE;     // TODO: pass in sample rate?
-    int32_t byteRate = sampleRate * 2; 
+    int32_t sampleRate = desiredSampleRate;
+    int32_t byteRate = desiredSampleRate * 2; 
     int16_t bitsPerSample = 16;               // 16-bit pcm wav
     int16_t frameSize = numChannels * 2;      // block align
     int32_t dataChunkSize = bufferSize * 2;   // each entry in the buffer is split into 2 int16
@@ -405,7 +436,13 @@ void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int 
     }
 }
 
-void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioParams* audioParams = NULL){
+void checkLoadedWAV(SDL_AudioSpec* audioSpec){
+    std::cout << "source num channels: " << (int)audioSpec->channels << '\n';
+    std::cout << "source sample rate: " << audioSpec->freq << '\n';
+    std::cout << "source format: " << audioSpec->format << '\n';
+}
+
+void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     std::cout << "playing: " << file << std::endl;
   
     // set up an AudioSpec to load in the file 
@@ -418,6 +455,8 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
         std::cout << "couldn't load wav file" << std::endl;
         return;
     }
+    
+    checkLoadedWAV(&wavSpec);
     
     // apply filters as needed. 
     // TODO: order currently is arbitrary. let user choose order?
@@ -438,11 +477,18 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
         
         // see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp
         soundtouch::SoundTouch soundTouch;
-        soundTouch.setSampleRate(sampleRate);
+        soundTouch.setSampleRate(audioParams->sampleRate);
         soundTouch.setChannels(2);
         soundTouch.setPitchSemiTones(audioParams->pitchShiftAmount);
         
-        audioData = pitchShift(audioDataStart, audioDataLen, soundTouch, !filterApplied);
+        audioData = pitchShift(
+            audioDataStart, 
+            audioDataLen, 
+            soundTouch, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
@@ -451,16 +497,30 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
     if(audioParams->lowpassFilterOn){
         std::cout << "lowpass filter on with cutoff: " << audioParams->lowpassCutoff << '\n';
         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying lowpass filter");
-        audioData = lowpassFilterAudio(audioDataStart, audioDataLen, audioParams->lowpassCutoff, !filterApplied);
+        audioData = lowpassFilterAudio(
+            audioDataStart, 
+            audioDataLen, 
+            audioParams->lowpassCutoff, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
     }
     
     if(audioParams->highpassFilterOn){
-        std::cout << "highpass filter on with cutoff: " <<  audioParams->highpassCutoff << '\n';
+        std::cout << "highpass filter on with cutoff: " << audioParams->highpassCutoff << '\n';
         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying highpass filter");
-        audioData = highpassFilterAudio(audioDataStart, audioDataLen, audioParams->highpassCutoff, !filterApplied);
+        audioData = highpassFilterAudio(
+            audioDataStart, 
+            audioDataLen, 
+            audioParams->highpassCutoff, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
@@ -470,7 +530,16 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
     if(audioParams->karaokeOn){
         std::cout << "karaoke on\n";
         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying karaoke");
-        audioData = convertToKaraoke(audioDataStart, audioDataLen, !filterApplied);
+        audioData = convertToKaraoke(
+            audioDataStart, 
+            audioDataLen, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
+            
+        filterApplied = true;
+        
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)(audioData.size() * (filterApplied ? sizeof(float) : 1));
         
@@ -478,13 +547,11 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
         audio.length = audioDataLen;
         
         // set up another SDL_AudioSpec with 1 channel to play the modified audio buffer of wavSpec
-        audioSpec.freq = sampleRate; //wavSpec.freq;
+        audioSpec.freq = audioParams->sampleRate;
         audioSpec.format = AUDIO_F32;
         audioSpec.channels = 1;
-        audioSpec.samples = wavSpec.samples;
         audioSpec.callback = audioCallback;
         audioSpec.userdata = &audio; // attach modified audio data to audio spec
-        filterApplied = true;
     }else{
         std::cout << "no karaoke\n";
         audio.position = audioDataStart; 
@@ -492,7 +559,7 @@ void playAudio(std::string file = "", int sampleRate = DEF_SAMPLE_RATE, AudioPar
         
         audioSpec.userdata = &audio;
         audioSpec.callback = audioCallback;
-        audioSpec.freq = sampleRate;
+        audioSpec.freq = audioParams->sampleRate;
         
         if(filterApplied){
           audioSpec.format = AUDIO_F32;
@@ -534,9 +601,8 @@ DWORD WINAPI playAudioProc(LPVOID lpParam){
     
     // TODO: don't need this part since this data should be in audioParams
     std::string filename = std::string((char*)(audioParams->filename));
-    int sampleRate = audioParams->sampleRate;
     
-    playAudio(filename, sampleRate, audioParams);
+    playAudio(filename, audioParams);
     
     return 0;
 }
@@ -584,7 +650,14 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         soundTouch.setChannels(2);
         soundTouch.setPitchSemiTones(audioParams->pitchShiftAmount);
         
-        audioData = pitchShift(audioDataStart, audioDataLen, soundTouch, !filterApplied);
+        audioData = pitchShift(
+            audioDataStart, 
+            audioDataLen, 
+            soundTouch, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
@@ -593,7 +666,14 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     if(audioParams->lowpassFilterOn){
         std::cout << "lowpass filter on with cutoff: " << audioParams->lowpassCutoff << '\n';
         //SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying lowpass filter");
-        audioData = lowpassFilterAudio(audioDataStart, audioDataLen, audioParams->lowpassCutoff, !filterApplied);
+        audioData = lowpassFilterAudio(
+            audioDataStart, 
+            audioDataLen, 
+            audioParams->lowpassCutoff, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
@@ -602,7 +682,14 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     if(audioParams->highpassFilterOn){
         std::cout << "highpass filter on with cutoff: " <<  audioParams->highpassCutoff << '\n';
         //SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying highpass filter");
-        audioData = highpassFilterAudio(audioDataStart, audioDataLen, audioParams->highpassCutoff, !filterApplied);
+        audioData = highpassFilterAudio(
+            audioDataStart, 
+            audioDataLen, 
+            audioParams->highpassCutoff, 
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
@@ -612,15 +699,23 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     if(audioParams->karaokeOn){
         std::cout << "karaoke on\n";
         //SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying karaoke");
-        audioData = convertToKaraoke(audioDataStart, audioDataLen, !filterApplied);
-        audioDataStart = (Uint8*)audioData.data();
-        audioDataLen = (Uint32)(audioData.size() * (filterApplied ? sizeof(float) : 1));
+        audioData = convertToKaraoke(
+            audioDataStart, 
+            audioDataLen,
+            wavSpec.format,
+            wavSpec.freq, 
+            audioParams->sampleRate, 
+            !filterApplied);
+            
         filterApplied = true;
         
-        writeWavToStream(stream, audioData, 1); // 1 channel
+        audioDataStart = (Uint8*)audioData.data();
+        audioDataLen = (Uint32)(audioData.size() * (filterApplied ? sizeof(float) : 1));
+        
+        writeWavToStream(stream, audioData, audioParams->sampleRate, 1); // 1 channel
     }else{
         std::cout << "no karaoke\n";
-        writeWavToStream(stream, audioData); // 2 channel
+        writeWavToStream(stream, audioData, audioParams->sampleRate); // 2 channel
     }
 
     SDL_FreeWAV(wavStart);
@@ -687,8 +782,7 @@ void handlePlay(SDL_AudioStatus currentState, DWORD WINAPI(*playFunc)(LPVOID)){
         audioParams->sampleRate = sampleRate;
 
         audioThread = CreateThread(NULL, 0, playFunc, audioParams, 0, 0);
-
-        //SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
+        
     }else if(currentState == SDL_AUDIO_PAUSED){
         // start up paused audio device again
         std::cout << "starting where we left off..." << std::endl;
@@ -801,7 +895,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
             }
         case WM_CLOSE:
             {
-                // TODO: make a delete function for AudioParams?
+                // TODO: make a delete function for AudioParams that we can reuse?
                 if(audioParams->filename != NULL){
                   delete[] audioParams->filename;
                 }
