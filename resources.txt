@@ -22,6 +22,7 @@ https://stackoverflow.com/questions/40155241/how-to-properly-use-or-asterisk-sym
 https://stackoverflow.com/questions/13592154/gnu-make-using-the-filter-function-in-prerequisites
 https://docs.microsoft.com/en-us/windows/win32/controls/trackbar-controls
 https://docs.microsoft.com/en-us/windows/win32/controls/create-a-trackbar
+https://cboard.cprogramming.com/windows-programming/59137-multiple-trackbars-controling-them-both.html
 
 // wav file info 
 http://www.cplusplus.com/forum/general/205408/

@@ -863,31 +863,47 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
             break;
         case WM_HSCROLL:
             {
+                int sliderId = GetDlgCtrlID((HWND)lParam);
+                
                 // handle trackbar/slider activity
                 switch(LOWORD(wParam)){
                     case TB_THUMBTRACK:
                     {
-                        HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
-                        DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                        if(sliderId == ID_PITCH_SHIFT_SLIDER){
+                            HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
+                            DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                            
+                            // the slider can only handle unsigned ints so we do some math
+                            // to make sure the value is between -MAX_PITCH_SHIFT and MAX_PITCH_SHIFT.
+                            // note that the range of the slider is 0 - MAX_PITCH_SHIFT*2.
+                            int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
+                            
+                            audioParams->pitchShiftAmount = actualPitchShiftVal;
+                            
+                            SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                        }
                         
-                        // the slider can only handle unsigned ints so we do some math
-                        // to make sure the value is between -MAX_PITCH_SHIFT and MAX_PITCH_SHIFT.
-                        // note that the range of the slider is 0 - MAX_PITCH_SHIFT*2.
-                        int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
-                        
-                        audioParams->pitchShiftAmount = actualPitchShiftVal;
-                        
-                        SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                        if(sliderId == ID_AUDIO_SCRUBBER){
+                            // TODO: stop the audio
+                            std::cout << "audio scrubber moved" << '\n';
+                        }
                     }
                     break;
                     case TB_ENDTRACK:
                     {
                         // on mouse up
-                        HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
-                        DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
-                        int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
-                        audioParams->pitchShiftAmount = actualPitchShiftVal;
-                        SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                        if(sliderId == ID_PITCH_SHIFT_SLIDER){
+                            HWND slider = GetDlgItem(hwnd, ID_PITCH_SHIFT_SLIDER);
+                            DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                            int actualPitchShiftVal = pos - MAX_PITCH_SHIFT;
+                            audioParams->pitchShiftAmount = actualPitchShiftVal;
+                            SetDlgItemText(hwnd, ID_PITCH_SHIFT_SLIDER_LABEL, std::to_string(actualPitchShiftVal).c_str());
+                        }
+                        
+                        if(sliderId == ID_AUDIO_SCRUBBER){
+                            // TODO: get position of slider, start audio playback at location
+                            std::cout << "audio scrubber mouseup" << '\n';
+                        }
                     }
                     break;
                 }
@@ -953,6 +969,32 @@ void setupPitchShiftSlider(
     SendMessage(slider, WM_SETFONT, (WPARAM)hFont, true);
     SendMessage(slider, TBM_SETRANGE, (WPARAM)true, (LPARAM)MAKELONG(minVal, maxVal));
     SendMessage(slider, TBM_SETPOS, (WPARAM)true, (LPARAM)MAX_PITCH_SHIFT);
+}
+
+// function to create and setup slider/trackbar for audio scrubbing
+void setupAudioScrubSlider(
+    int width,
+    int height,
+    int xCoord,
+    int yCoord,
+    HWND parent,
+    HINSTANCE hInstance,
+    HFONT hFont
+){
+    HWND slider = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        TRACKBAR_CLASS,
+        "audio scrubber",
+        WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS | TBS_ENABLESELRANGE,
+        xCoord, yCoord,
+        width, height,
+        parent,
+        (HMENU)ID_AUDIO_SCRUBBER,
+        hInstance,
+        NULL
+    );
+    
+    SendMessage(slider, WM_SETFONT, (WPARAM)hFont, true);
 }
 
 // function for creating buttons
@@ -1109,7 +1151,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SendMessage(pitchShiftSliderLabel, WM_SETFONT, (WPARAM)hFont, true);
     
     // slider/trackbar for selecting pitch shift value
-    setupPitchShiftSlider(160, 20, 370, 60, hwnd, hInstance, hFont);
+    setupPitchShiftSlider(160, 25, 370, 60, hwnd, hInstance, hFont);
     
     // add a label so we can display the current pitch shift value
     HWND addPitchShiftLabel = CreateWindow(
@@ -1276,6 +1318,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         NULL
     );
     SendMessage(downloadButton, WM_SETFONT, (WPARAM)hFont, true);
+    
+    HWND audioScrubberLabel = CreateWindow(
+        TEXT("STATIC"),
+        TEXT("seek: "),
+        WS_VISIBLE | WS_CHILD,
+        340, 140, // x, y
+        100, 20,
+        hwnd,
+        (HMENU)ID_AUDIO_SCRUBBER_LABEL,
+        hInstance,
+        NULL
+    );
+    SendMessage(audioScrubberLabel, WM_SETFONT, (WPARAM)hFont, true);
+    
+    // audio scrubber
+    setupAudioScrubSlider(180, 30, 375, 140, hwnd, hInstance, hFont); // width, height, x, y
     
     // display the current state of the app
     HWND currStateLabel = CreateWindow(
