@@ -139,6 +139,17 @@ int interpolateLength(float newX, float x1, float y1, float x2, float y2){
     return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
 }
 
+double getAudioDuration(SDL_AudioSpec& spec, uint32_t audioLen){
+    // https://stackoverflow.com/questions/76030221/is-it-possible-to-get-length-in-seconds-of-a-loaded-wav-file-in-sdl-library
+    uint32_t sampleSize = SDL_AUDIO_BITSIZE(spec.format) / 8;
+    uint32_t sampleCount = audioLen / sampleSize;
+    uint32_t sampleLen = sampleCount;
+    if(spec.channels){
+      sampleLen = sampleCount / spec.channels;
+    }
+    return (double)sampleLen / (double)spec.freq;
+}
+
 /* get a vector of the evenly-distributed indices to sample from the dataset based on num samples desired (for visuzalization)
 // https://stackoverflow.com/questions/9873626/choose-m-evenly-spaced-elements-from-a-sequence-of-length-n
 std::vector<int> getSampleIndices(int dataLen, int numSamples){
@@ -177,7 +188,7 @@ void audioCallback(void* userData, Uint8* stream, int length){
 
 // pitch shifting works with Stephan Bernsee's solution, but note that it's slow. just don't think it's broken...
 // use gdb to run it and check
-// Olli Parviainen's SoundTouch works well and seems pretty fast (for my demo sample) but gets slower with larger audio files (which is probably expected?).
+// Olli Parviainen's SoundTouch works very well and seems pretty fast (for my demo sample) but gets slower with larger audio files as one might expect.
 std::vector<float> pitchShift(
     Uint8* wavStart, 
     Uint32 wavLength, 
@@ -456,7 +467,10 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
         return;
     }
     
-    checkLoadedWAV(&wavSpec);
+    checkLoadedWAV(&wavSpec); // for debugging
+    
+    double duration = getAudioDuration(wavSpec, wavLength);
+    std::cout << "duration: " << duration << " sec\n";
     
     // apply filters as needed. 
     // TODO: order currently is arbitrary. let user choose order?
@@ -579,9 +593,16 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
     SDL_PauseAudioDevice(audioDevice, 0);
     
+    double elapsedTime = 0;
     while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
+        
+        // move audio scrub marker position
+        // TODO: not quite accurate yet (audio finishes before reaching end, but that's better than reaching the end before the audio ends I think)
+        HWND audioScrubber = GetDlgItem(hwnd, ID_AUDIO_SCRUBBER);
+        SendMessage(audioScrubber, TBM_SETPOS, (WPARAM)true, (LPARAM)(((elapsedTime+0.01) / duration) * 180.0)); // 180 is the width of the slider. TODO: can we not hardcode??
+        elapsedTime += 0.01; // 0.01 sec, since SDL_Delay takes at least 10 ms and we divide elapsedTime by duration, which is in seconds
         
         // check if we need to stop
         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
@@ -884,8 +905,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         }
                         
                         if(sliderId == ID_AUDIO_SCRUBBER){
-                            // TODO: stop the audio
-                            std::cout << "audio scrubber moved" << '\n';
+                            // stop the audio
+                            SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+                            std::cout << "the current state is: " << currentState << std::endl;
+                            SDL_CloseAudioDevice(currentDeviceID);
+                            SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
                         }
                     }
                     break;
@@ -995,6 +1019,7 @@ void setupAudioScrubSlider(
     );
     
     SendMessage(slider, WM_SETFONT, (WPARAM)hFont, true);
+    SendMessage(slider, TBM_SETRANGE, (WPARAM)true, (LPARAM)MAKELONG(0, 180));
 }
 
 // function for creating buttons
@@ -1323,7 +1348,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         TEXT("STATIC"),
         TEXT("seek: "),
         WS_VISIBLE | WS_CHILD,
-        340, 140, // x, y
+        330, 140, // x, y
         100, 20,
         hwnd,
         (HMENU)ID_AUDIO_SCRUBBER_LABEL,
@@ -1333,7 +1358,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SendMessage(audioScrubberLabel, WM_SETFONT, (WPARAM)hFont, true);
     
     // audio scrubber
-    setupAudioScrubSlider(180, 30, 375, 140, hwnd, hInstance, hFont); // width, height, x, y
+    setupAudioScrubSlider(180, 25, 365, 140, hwnd, hInstance, hFont); // width, height, x, y
     
     // display the current state of the app
     HWND currStateLabel = CreateWindow(

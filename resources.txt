@@ -23,6 +23,7 @@ https://stackoverflow.com/questions/13592154/gnu-make-using-the-filter-function-
 https://docs.microsoft.com/en-us/windows/win32/controls/trackbar-controls
 https://docs.microsoft.com/en-us/windows/win32/controls/create-a-trackbar
 https://cboard.cprogramming.com/windows-programming/59137-multiple-trackbars-controling-them-both.html
+https://stackoverflow.com/questions/76030221/is-it-possible-to-get-length-in-seconds-of-a-loaded-wav-file-in-sdl-library
 
 // wav file info 
 http://www.cplusplus.com/forum/general/205408/
