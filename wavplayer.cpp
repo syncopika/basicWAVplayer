@@ -593,19 +593,20 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
     SDL_PauseAudioDevice(audioDevice, 0);
     
-    double elapsedTime = 0;
+    double totalAudioLen = (double)audio.length;
     while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
         
+        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
+        
         // move audio scrub marker position
-        // TODO: not quite accurate yet (audio finishes before reaching end, but that's better than reaching the end before the audio ends I think)
-        HWND audioScrubber = GetDlgItem(hwnd, ID_AUDIO_SCRUBBER);
-        SendMessage(audioScrubber, TBM_SETPOS, (WPARAM)true, (LPARAM)(((elapsedTime+0.01) / duration) * 180.0)); // 180 is the width of the slider. TODO: can we not hardcode??
-        elapsedTime += 0.01; // 0.01 sec, since SDL_Delay takes at least 10 ms and we divide elapsedTime by duration, which is in seconds
+        if(currentState == SDL_AUDIO_PLAYING){
+            HWND audioScrubber = GetDlgItem(hwnd, ID_AUDIO_SCRUBBER);
+            SendMessage(audioScrubber, TBM_SETPOS, (WPARAM)true, (LPARAM)(int)(180.0 - (audio.length / totalAudioLen * 180.0))); // 180 is the width of the slider. TODO: can we not hardcode??
+        }
         
         // check if we need to stop
-        SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
         if(currentState == SDL_AUDIO_STOPPED) break;
     }
     
@@ -1009,7 +1010,7 @@ void setupAudioScrubSlider(
         WS_EX_CLIENTEDGE,
         TRACKBAR_CLASS,
         "audio scrubber",
-        WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS | TBS_ENABLESELRANGE,
+        WS_CHILD | WS_VISIBLE | TBS_NOTICKS | TBS_ENABLESELRANGE | TBS_TOOLTIPS,
         xCoord, yCoord,
         width, height,
         parent,
