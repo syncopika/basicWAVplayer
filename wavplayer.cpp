@@ -549,7 +549,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     
     // do karaoke last since it's single channeled
     if(audioParams->karaokeOn){
-        std::cout << "karaoke on\n";
+        std::cout << "off-vocal on\n";
         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying off-vocal");
         audioData = convertToKaraoke(
             audioDataStart, 
@@ -574,7 +574,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
         audioSpec.callback = audioCallback;
         audioSpec.userdata = &audio; // attach modified audio data to audio spec
     }else{
-        std::cout << "no karaoke\n";
+        std::cout << "no off-vocal\n";
         audio.position = audioDataStart + audioParams->audioStartPos;
         audio.length = audioDataLen * (filterApplied ? sizeof(float) : 1) - audioParams->audioStartPos; // if we've applied a filter, the data is float* so we need to multiply by 4 to get total bytes (since 4 bytes per float)
         
