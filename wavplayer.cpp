@@ -550,7 +550,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     // do karaoke last since it's single channeled
     if(audioParams->karaokeOn){
         std::cout << "karaoke on\n";
-        SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying karaoke");
+        SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying off-vocal");
         audioData = convertToKaraoke(
             audioDataStart, 
             audioDataLen, 
@@ -735,7 +735,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     
     // do karaoke last since it's single channeled
     if(audioParams->karaokeOn){
-        std::cout << "karaoke on\n";
+        std::cout << "off-vocal on\n";
         //SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: applying karaoke");
         audioData = convertToKaraoke(
             audioDataStart, 
@@ -752,7 +752,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         
         writeWavToStream(stream, audioData, audioParams->sampleRate, 1); // 1 channel
     }else{
-        std::cout << "no karaoke\n";
+        std::cout << "no off-vocal\n";
         writeWavToStream(stream, audioData, audioParams->sampleRate); // 2 channel
     }
 
