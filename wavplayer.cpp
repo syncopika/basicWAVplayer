@@ -34,6 +34,8 @@
 #define VISUALIZER_WINDOW_WIDTH 510
 #define VISUALIZER_WINDOW_HEIGHT 180
 
+#define AUDIO_SEEK_SLIDER_WIDTH 180.0
+
 // max value for pitch shift
 #define MAX_PITCH_SHIFT 5
 
@@ -60,6 +62,10 @@ HANDLE audioThread;
 //SDL_Window* sdlWnd;
 //SDL_Renderer* sdlRend;
 
+// hacky way of knowing what the currently-playing audio's total length is (in bytes)
+// when the audio scrub slider is moved (so we can calculate playback position based on slider pos)
+int currAudioTotalLen = 0;
+
 // audio data struct that callback will use
 struct AudioData {
     Uint8* position;
@@ -76,6 +82,7 @@ struct AudioParams {
     bool highpassFilterOn;
     int lowpassCutoff;
     int highpassCutoff;
+    int audioStartPos; // where to start playing audio, if specified
 };
 
 AudioParams* audioParams = new AudioParams();
@@ -555,10 +562,10 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
         filterApplied = true;
         
         audioDataStart = (Uint8*)audioData.data();
-        audioDataLen = (Uint32)(audioData.size() * (filterApplied ? sizeof(float) : 1));
+        audioDataLen = (Uint32)audioData.size();
         
-        audio.position = audioDataStart; 
-        audio.length = audioDataLen;
+        audio.position = audioDataStart + audioParams->audioStartPos;
+        audio.length = audioDataLen * (filterApplied ? sizeof(float) : 1) - audioParams->audioStartPos;
         
         // set up another SDL_AudioSpec with 1 channel to play the modified audio buffer of wavSpec
         audioSpec.freq = audioParams->sampleRate;
@@ -568,8 +575,8 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
         audioSpec.userdata = &audio; // attach modified audio data to audio spec
     }else{
         std::cout << "no karaoke\n";
-        audio.position = audioDataStart; 
-        audio.length = audioDataLen * (filterApplied ? sizeof(float) : 1); // if we've applied a filter, the data is float* so we need to multiply by 4 to get total bytes (since 4 bytes per float)
+        audio.position = audioDataStart + audioParams->audioStartPos;
+        audio.length = audioDataLen * (filterApplied ? sizeof(float) : 1) - audioParams->audioStartPos; // if we've applied a filter, the data is float* so we need to multiply by 4 to get total bytes (since 4 bytes per float)
         
         audioSpec.userdata = &audio;
         audioSpec.callback = audioCallback;
@@ -593,7 +600,11 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: playing");
     SDL_PauseAudioDevice(audioDevice, 0);
     
-    double totalAudioLen = (double)audio.length;
+    double totalAudioLen = (double)audioDataLen * (filterApplied ? sizeof(float) : 1); //audio.length;
+    currAudioTotalLen = totalAudioLen;
+    
+    std::cout << "starting play at position: " << audioParams->audioStartPos << ", total audio length: " << (int)totalAudioLen << ", length of audio to play: " << audio.length << '\n';
+    
     while(audio.length > 0){
         // keep thread alive
         SDL_Delay(10);
@@ -603,7 +614,12 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
         // move audio scrub marker position
         if(currentState == SDL_AUDIO_PLAYING){
             HWND audioScrubber = GetDlgItem(hwnd, ID_AUDIO_SCRUBBER);
-            SendMessage(audioScrubber, TBM_SETPOS, (WPARAM)true, (LPARAM)(int)(180.0 - (audio.length / totalAudioLen * 180.0))); // 180 is the width of the slider. TODO: can we not hardcode??
+            SendMessage(
+                audioScrubber, 
+                TBM_SETPOS, 
+                (WPARAM)true, 
+                (LPARAM)(int)(AUDIO_SEEK_SLIDER_WIDTH - ((double)audio.length / totalAudioLen * AUDIO_SEEK_SLIDER_WIDTH)) // audio.length here is the amount of audio remaining to play
+            );
         }
         
         // check if we need to stop
@@ -824,6 +840,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                     {
                         SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                         std::cout << "the current state is: " << currentState << std::endl;
+                        audioParams->audioStartPos = 0;
                         handlePlay(currentState, playAudioProc);
                     }
                     break;
@@ -849,6 +866,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         std::cout << "the current state is: " << currentState << std::endl;
                         SDL_CloseAudioDevice(currentDeviceID);
                         SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
+                        audioParams->audioStartPos = 0;
                     }
                     break;
                 case ID_DOWNLOAD_BUTTON:
@@ -886,6 +904,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
         case WM_HSCROLL:
             {
                 int sliderId = GetDlgCtrlID((HWND)lParam);
+                SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                 
                 // handle trackbar/slider activity
                 switch(LOWORD(wParam)){
@@ -907,7 +926,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         
                         if(sliderId == ID_AUDIO_SCRUBBER){
                             // stop the audio
-                            SDL_AudioStatus currentState = SDL_GetAudioDeviceStatus(currentDeviceID);
                             std::cout << "the current state is: " << currentState << std::endl;
                             SDL_CloseAudioDevice(currentDeviceID);
                             SetDlgItemText(hwnd, ID_CURR_STATE_LABEL, "state: stopped");
@@ -926,8 +944,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         }
                         
                         if(sliderId == ID_AUDIO_SCRUBBER){
-                            // TODO: get position of slider, start audio playback at location
-                            std::cout << "audio scrubber mouseup" << '\n';
+                            // get position of slider, start audio playback at location
+                            HWND slider = GetDlgItem(hwnd, ID_AUDIO_SCRUBBER);
+                            DWORD pos = SendMessage(slider, TBM_GETPOS, 0, 0);
+                            //std::cout << "audio scrubber pos: " << pos << '\n';
+                            //std::cout << "curr audio total len: " << currAudioTotalLen << '\n';
+                            
+                            int audioStartPos = (int)(((double)pos / AUDIO_SEEK_SLIDER_WIDTH) * (double)currAudioTotalLen);
+                            
+                            // note! the audioStartPos should be divisible by 2. why? I'm not really sure but maybe it has something to do with channels?
+                            // TODO: check behavior for off-vocal (1 channel) - that scenario might not need audioStartPos to be divisible by 2?
+                            if(audioStartPos % 2 != 0){
+                              audioStartPos++;
+                            }
+                            
+                            audioParams->audioStartPos = audioStartPos;
+                            //std::cout << "setting audio start pos: " << audioStartPos << ", " << "curr audio total len: " << currAudioTotalLen << '\n';
+                            handlePlay(currentState, playAudioProc);
                         }
                     }
                     break;
@@ -1020,7 +1053,7 @@ void setupAudioScrubSlider(
     );
     
     SendMessage(slider, WM_SETFONT, (WPARAM)hFont, true);
-    SendMessage(slider, TBM_SETRANGE, (WPARAM)true, (LPARAM)MAKELONG(0, 180));
+    SendMessage(slider, TBM_SETRANGE, (WPARAM)true, (LPARAM)MAKELONG(0, AUDIO_SEEK_SLIDER_WIDTH));
 }
 
 // function for creating buttons
@@ -1152,7 +1185,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     HWND addSampleRateEdit = CreateWindow(
         TEXT("edit"),
-        TEXT("44100"),
+        TEXT("48000"),
         WS_VISIBLE | WS_CHILD | WS_BORDER,
         170, 60,
         70, 20,
@@ -1275,10 +1308,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
     SendMessage(addHighPassCutoffEdit, WM_SETFONT, (WPARAM)hFont, true);
     
-    // toggle karaoke checkbox
+    // toggle karaoke/off-vocal checkbox
     HWND checkBox2 = CreateWindow(
         TEXT("button"),
-        TEXT("karaoke"),
+        TEXT("off vocal"),
         BS_AUTOCHECKBOX | WS_CHILD | WS_VISIBLE,
         480, 100,  /* x, y coords */
         80, 20, /* width, height */
@@ -1359,7 +1392,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SendMessage(audioScrubberLabel, WM_SETFONT, (WPARAM)hFont, true);
     
     // audio scrubber
-    setupAudioScrubSlider(180, 25, 365, 140, hwnd, hInstance, hFont); // width, height, x, y
+    setupAudioScrubSlider(AUDIO_SEEK_SLIDER_WIDTH, 25, 365, 140, hwnd, hInstance, hFont); // width, height, x, y
     
     // display the current state of the app
     HWND currStateLabel = CreateWindow(
