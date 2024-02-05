@@ -954,6 +954,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                             
                             // note! the audioStartPos should be divisible by 2. why? I'm not really sure but maybe it has something to do with channels?
                             // TODO: check behavior for off-vocal (1 channel) - that scenario might not need audioStartPos to be divisible by 2?
+                            // also, sometimes moving the seek marker results in silence - I'm not sure why yet atm, need to investigate
                             if(audioStartPos % 2 != 0){
                               audioStartPos++;
                             }
