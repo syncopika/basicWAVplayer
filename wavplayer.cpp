@@ -211,7 +211,7 @@ std::vector<float> pitchShift(
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, desiredSampleRate);
+      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -235,7 +235,7 @@ std::vector<float> pitchShift(
     int numChunks = 8; // why 8?
     int sampleChunkSize = floatBufLen / numChunks; // number of floats per chunk
     
-    int counter = 0;
+    int index = 0;
     try{
         // https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp#L191
         for(int k = 0; k < numChunks; k++){
@@ -248,7 +248,7 @@ std::vector<float> pitchShift(
                 nSamples = soundTouch.receiveSamples(nextDataToProcess, buffSizeSamples); // assuming 2 channels
                 
                 for(int i = 0; i < nSamples * numChannels; i++){
-                    modifiedData[counter++] = nextDataToProcess[i];
+                    modifiedData[index++] = nextDataToProcess[i];
                 }
             } while (nSamples != 0);
         }
@@ -416,6 +416,40 @@ std::vector<float> highpassFilterAudio(
     return modifiedData;
 }
 
+// get audio data to vector<float>
+std::vector<float> extractAudioData(
+    Uint8* wavStart,
+    Uint32 wavLength,
+    SDL_AudioFormat srcFormat,
+    int srcSampleRate
+){
+    SDL_AudioCVT cvt;
+    
+    // convert audio data to F32 
+    SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+    cvt.len = wavLength;
+    cvt.buf = (Uint8*)SDL_malloc(cvt.len * cvt.len_mult);
+    
+    // copy current audio data to the buffer (dest, src, len)
+    SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
+    SDL_ConvertAudio(&cvt);
+    
+    // audio data is now in float form!
+    float*  newData = (float*)cvt.buf;
+    int floatBufLen = (int)cvt.len_cvt / 4; // 4 bytes per float
+    
+    std::vector<float> floatAudioData(floatBufLen);
+    
+    for(int i = 0; i < floatBufLen; i++){
+      floatAudioData[i] = (float)newData[i];
+    }
+    
+    // make sure to free allocated space!
+    SDL_free(cvt.buf);
+    
+    return floatAudioData;
+}
+
 void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int desiredSampleRate, int nChannels = 2){
     int32_t bufferSize = (int32_t)audioData.size();
     int32_t riffChunkSize = 36 + bufferSize * 2;
@@ -460,8 +494,9 @@ void checkLoadedWAV(SDL_AudioSpec* audioSpec){
     std::cout << "source format: " << audioSpec->format << '\n';
 }
 
-void playAudio(std::string file = "", AudioParams* audioParams = NULL){
-    std::cout << "playing: " << file << std::endl;
+void playAudio(AudioParams* audioParams){
+    std::string filename = std::string((char*)(audioParams->filename));
+    std::cout << "playing: " << filename << std::endl;
   
     // set up an AudioSpec to load in the file 
     SDL_AudioSpec wavSpec;
@@ -469,7 +504,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     Uint32 wavLength;
     
     // load the wav file and some of its properties to the specified variables 
-    if(SDL_LoadWAV(file.c_str(), &wavSpec, &wavStart, &wavLength) == NULL){
+    if(SDL_LoadWAV(audioParams->filename, &wavSpec, &wavStart, &wavLength) == NULL){
         std::cout << "couldn't load wav file" << std::endl;
         return;
     }
@@ -484,6 +519,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
     std::vector<float> audioData;
     Uint8* audioDataStart = wavStart;
     Uint32 audioDataLen = wavLength;
+    
     AudioData audio;
     SDL_AudioSpec audioSpec = wavSpec;
     bool filterApplied = false;
@@ -637,10 +673,7 @@ void playAudio(std::string file = "", AudioParams* audioParams = NULL){
 DWORD WINAPI playAudioProc(LPVOID lpParam){
     AudioParams* audioParams = (AudioParams*)lpParam;
     
-    // TODO: don't need this part since this data should be in audioParams
-    std::string filename = std::string((char*)(audioParams->filename));
-    
-    playAudio(filename, audioParams);
+    playAudio(audioParams);
     
     return 0;
 }
@@ -699,6 +732,15 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
         filterApplied = true;
+    }else{
+        // if no pitch shift, just extract audio to a vector<float>
+        audioData = extractAudioData(
+            audioDataStart,
+            audioDataLen,
+            wavSpec.format,
+            wavSpec.freq);
+        audioDataStart = (Uint8*)audioData.data();
+        audioDataLen = (Uint32)audioData.size();
     }
     
     if(audioParams->lowpassFilterOn){
