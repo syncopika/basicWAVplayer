@@ -790,7 +790,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         filterApplied = true;
         
         audioDataStart = (Uint8*)audioData.data();
-        audioDataLen = (Uint32)(audioData.size() * (filterApplied ? sizeof(float) : 1));
+        audioDataLen = (Uint32)(audioData.size() * sizeof(float)); // audio data should always be float
         
         writeWavToStream(stream, audioData, audioParams->sampleRate, 1); // 1 channel
     }else{
