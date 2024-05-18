@@ -453,6 +453,8 @@ std::vector<float> extractAudioData(
       floatAudioData[i] = (float)newData[i];
     }
     
+    std::cout << "extracted audio data - float buffer len:" << floatBufLen << '\n';
+    
     // make sure to free allocated space!
     SDL_free(cvt.buf);
     
@@ -720,6 +722,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     
     // get loaded audio's num channels
     audioParams->numChannels = (int)wavSpec.channels;
+    std::cout << "num channels: " << audioParams->numChannels << '\n';
     
     // get string name
     std::string file(audioParams->filename);
@@ -733,7 +736,6 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
     std::vector<float> audioData;
     Uint8* audioDataStart = wavStart;
     Uint32 audioDataLen = wavLength;
-    bool filterApplied = false;
     
     // TODO: for some reason, doing pitch shift after lowpass filter breaks things.
     // there's a seg fault happening in pitchShift() but not really clear why atm. need to investigate.
@@ -755,10 +757,9 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             wavSpec.freq, 
             audioParams->sampleRate,
             audioParams->numChannels,
-            !filterApplied);
+            true);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
-        filterApplied = true;
     }else{
         // if no pitch shift, just extract audio to a vector<float>
         audioData = extractAudioData(
@@ -781,11 +782,10 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             wavSpec.format,
             wavSpec.freq, 
             audioParams->sampleRate,
-            2,
-            !filterApplied);
+            audioParams->numChannels,
+            false);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
-        filterApplied = true;
     }
     
     if(audioParams->highpassFilterOn){
@@ -798,11 +798,10 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             wavSpec.format,
             wavSpec.freq, 
             audioParams->sampleRate,
-            2,
-            !filterApplied);
+            audioParams->numChannels,
+            false);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
-        filterApplied = true;
     }
     
     // do karaoke last since it's single channeled
@@ -815,10 +814,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             wavSpec.format,
             wavSpec.freq, 
             audioParams->sampleRate,
-            2,
-            !filterApplied);
-            
-        filterApplied = true;
+            audioParams->numChannels,
+            false);
         
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)(audioData.size() * sizeof(float)); // audio data should always be float
@@ -826,7 +823,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         writeWavToStream(stream, audioData, audioParams->sampleRate, 1); // 1 channel
     }else{
         std::cout << "no off-vocal\n";
-        writeWavToStream(stream, audioData, audioParams->sampleRate, audioParams->numChannels); // 2 channel
+        writeWavToStream(stream, audioData, audioParams->sampleRate, audioParams->numChannels);
     }
 
     SDL_FreeWAV(wavStart);
