@@ -76,6 +76,7 @@ struct AudioData {
 struct AudioParams {
     char* filename=NULL;
     int sampleRate; // desired sample rate by user
+    int numChannels;
     int pitchShiftAmount;
     bool karaokeOn;
     bool lowpassFilterOn;
@@ -142,9 +143,11 @@ int getIntFromTextbox(int dlgItemId){
     return theNum;
 }
 
+/*
 int interpolateLength(float newX, float x1, float y1, float x2, float y2){
     return std::round(y1 + (newX - x1) * ((y2-y1)/(x2-x1)));
 }
+*/
 
 double getAudioDuration(SDL_AudioSpec& spec, uint32_t audioLen){
     // https://stackoverflow.com/questions/76030221/is-it-possible-to-get-length-in-seconds-of-a-loaded-wav-file-in-sdl-library
@@ -202,7 +205,8 @@ std::vector<float> pitchShift(
     soundtouch::SoundTouch& soundTouch, 
     SDL_AudioFormat srcFormat,
     int srcSampleRate, 
-    int desiredSampleRate, 
+    int desiredSampleRate,
+    int numChannels,
     bool convertToFloat
 ){
     float* newData = (float*)wavStart;
@@ -211,7 +215,7 @@ std::vector<float> pitchShift(
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+      SDL_BuildAudioCVT(&cvt, srcFormat, numChannels, srcSampleRate, AUDIO_F32, numChannels, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -226,7 +230,8 @@ std::vector<float> pitchShift(
     
     std::cout << "pitchshift - float buffer len:" << floatBufLen << '\n';
     
-    int numChannels = 2; // assuming 2 channels. TODO: don't assume this
+    // we assume 2 channels now after audio conversion
+    numChannels = 2;
     
     int buffSizeSamples = floatBufLen / numChannels;
     
@@ -245,7 +250,7 @@ std::vector<float> pitchShift(
             soundTouch.putSamples(nextDataToProcess, nSamples);
             
             do{
-                nSamples = soundTouch.receiveSamples(nextDataToProcess, buffSizeSamples); // assuming 2 channels
+                nSamples = soundTouch.receiveSamples(nextDataToProcess, buffSizeSamples);
                 
                 for(int i = 0; i < nSamples * numChannels; i++){
                     modifiedData[index++] = nextDataToProcess[i];
@@ -270,7 +275,8 @@ std::vector<float> convertToKaraoke(
     Uint32 wavLength, 
     SDL_AudioFormat srcFormat,
     int srcSampleRate, 
-    int desiredSampleRate, 
+    int desiredSampleRate,
+    int numChannels,
     bool convertToFloat
 ){
     float* newData = (float*)wavStart;
@@ -282,7 +288,7 @@ std::vector<float> convertToKaraoke(
     
     if(convertToFloat){
       // convert audio data to F32
-      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+      SDL_BuildAudioCVT(&cvt, srcFormat, numChannels, srcSampleRate, AUDIO_F32, numChannels, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -326,7 +332,8 @@ std::vector<float> lowpassFilterAudio(
     int cutoffVal, 
     SDL_AudioFormat srcFormat,
     int srcSampleRate, 
-    int desiredSampleRate, 
+    int desiredSampleRate,
+    int numChannels,
     bool convertToFloat
 ){
     float* newData = (float*)wavStart;
@@ -335,7 +342,7 @@ std::vector<float> lowpassFilterAudio(
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+      SDL_BuildAudioCVT(&cvt, srcFormat, numChannels, srcSampleRate, AUDIO_F32, numChannels, srcSampleRate);
       cvt.len = wavLength;
       cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
       
@@ -375,7 +382,8 @@ std::vector<float> highpassFilterAudio(
     int cutoffVal, 
     SDL_AudioFormat srcFormat,
     int srcSampleRate, 
-    int desiredSampleRate, 
+    int desiredSampleRate,
+    int numChannels,
     bool convertToFloat
 ){
     float* newData = (float*)wavStart;
@@ -384,9 +392,9 @@ std::vector<float> highpassFilterAudio(
     
     if(convertToFloat){
       // convert audio data to F32 
-      SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+      SDL_BuildAudioCVT(&cvt, srcFormat, numChannels, srcSampleRate, AUDIO_F32, numChannels, srcSampleRate);
       cvt.len = wavLength;
-      cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
+      cvt.buf = (Uint8*)SDL_malloc(cvt.len * cvt.len_mult);
       
       // copy current audio data to the buffer (dest, src, len)
       SDL_memcpy(cvt.buf, wavStart, wavLength); // wavLength is the total number of bytes the audio data takes up
@@ -421,12 +429,13 @@ std::vector<float> extractAudioData(
     Uint8* wavStart,
     Uint32 wavLength,
     SDL_AudioFormat srcFormat,
-    int srcSampleRate
+    int srcSampleRate,
+    int srcNumChannels
 ){
     SDL_AudioCVT cvt;
     
     // convert audio data to F32 
-    SDL_BuildAudioCVT(&cvt, srcFormat, 2, srcSampleRate, AUDIO_F32, 2, srcSampleRate);
+    SDL_BuildAudioCVT(&cvt, srcFormat, srcNumChannels, srcSampleRate, AUDIO_F32, srcNumChannels, srcSampleRate);
     cvt.len = wavLength;
     cvt.buf = (Uint8*)SDL_malloc(cvt.len * cvt.len_mult);
     
@@ -435,7 +444,7 @@ std::vector<float> extractAudioData(
     SDL_ConvertAudio(&cvt);
     
     // audio data is now in float form!
-    float*  newData = (float*)cvt.buf;
+    float* newData = (float*)cvt.buf;
     int floatBufLen = (int)cvt.len_cvt / 4; // 4 bytes per float
     
     std::vector<float> floatAudioData(floatBufLen);
@@ -463,18 +472,18 @@ void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int 
     int32_t dataChunkSize = bufferSize * 2;   // each entry in the buffer is split into 2 int16
     
     stream.write("RIFF", 4);
-    stream.write(reinterpret_cast<char *>(&riffChunkSize), sizeof(int32_t));
+    stream.write(reinterpret_cast<char*>(&riffChunkSize), sizeof(int32_t));
     stream.write("WAVE", 4);
     stream.write("fmt ", 4);
-    stream.write(reinterpret_cast<char *>(&formatSize), sizeof(int32_t));
-    stream.write(reinterpret_cast<char *>(&pcm), sizeof(int16_t)); 
-    stream.write(reinterpret_cast<char *>(&numChannels), sizeof(int16_t)); 
-    stream.write(reinterpret_cast<char *>(&sampleRate), sizeof(int32_t));
-    stream.write(reinterpret_cast<char *>(&byteRate), sizeof(int32_t));
-    stream.write(reinterpret_cast<char *>(&frameSize), sizeof(int16_t));
-    stream.write(reinterpret_cast<char *>(&bitsPerSample), sizeof(int16_t));
+    stream.write(reinterpret_cast<char*>(&formatSize), sizeof(int32_t));
+    stream.write(reinterpret_cast<char*>(&pcm), sizeof(int16_t)); 
+    stream.write(reinterpret_cast<char*>(&numChannels), sizeof(int16_t)); 
+    stream.write(reinterpret_cast<char*>(&sampleRate), sizeof(int32_t));
+    stream.write(reinterpret_cast<char*>(&byteRate), sizeof(int32_t));
+    stream.write(reinterpret_cast<char*>(&frameSize), sizeof(int16_t));
+    stream.write(reinterpret_cast<char*>(&bitsPerSample), sizeof(int16_t));
     stream.write("data", 4); 
-    stream.write(reinterpret_cast<char *>(&dataChunkSize), sizeof(int32_t));
+    stream.write(reinterpret_cast<char*>(&dataChunkSize), sizeof(int32_t));
     
     for(int32_t i = 0; i < bufferSize; i++){
         float maximum = fmax(-1.0, fmin(1.0, audioData[i]));
@@ -484,7 +493,7 @@ void writeWavToStream(std::ofstream& stream, std::vector<float>& audioData, int 
         }else{
             m2 = maximum * 0x7FFF;
         }
-        stream.write(reinterpret_cast<char *>(&m2), sizeof(int16_t));
+        stream.write(reinterpret_cast<char*>(&m2), sizeof(int16_t));
     }
 }
 
@@ -511,6 +520,16 @@ void playAudio(AudioParams* audioParams){
     
     checkLoadedWAV(&wavSpec); // for debugging
     
+    // get loaded audio's num channels
+    audioParams->numChannels = (int)wavSpec.channels;
+    
+    /*
+    // TODO: can we do this when we find the file?
+    // update sample rate edit box to loaded audio's sample rate
+    HWND sampleRateEdit = GetDlgItem(hwnd, ID_SPECIFY_SAMPLE_RATE);
+    SendMessage(sampleRateEdit, WM_SETTEXT, (WPARAM)true, (LPARAM)wavSpec.freq);
+    */
+    
     double duration = getAudioDuration(wavSpec, wavLength);
     std::cout << "duration: " << duration << " sec\n";
     
@@ -535,7 +554,7 @@ void playAudio(AudioParams* audioParams){
         // see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp
         soundtouch::SoundTouch soundTouch;
         soundTouch.setSampleRate(audioParams->sampleRate);
-        soundTouch.setChannels(2);
+        soundTouch.setChannels(audioParams->numChannels);
         soundTouch.setPitchSemiTones(audioParams->pitchShiftAmount);
         
         audioData = pitchShift(
@@ -544,7 +563,8 @@ void playAudio(AudioParams* audioParams){
             soundTouch, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            audioParams->numChannels,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -560,7 +580,8 @@ void playAudio(AudioParams* audioParams){
             audioParams->lowpassCutoff, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            audioParams->numChannels,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -576,7 +597,8 @@ void playAudio(AudioParams* audioParams){
             audioParams->highpassCutoff, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            audioParams->numChannels,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -592,7 +614,8 @@ void playAudio(AudioParams* audioParams){
             audioDataLen, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            audioParams->numChannels,
             !filterApplied);
             
         filterApplied = true;
@@ -620,7 +643,7 @@ void playAudio(AudioParams* audioParams){
         
         if(filterApplied){
           audioSpec.format = AUDIO_F32;
-          audioSpec.channels = 2;
+          audioSpec.channels = audioParams->numChannels; //2;
         }
     }
     
@@ -695,6 +718,9 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         return 0;
     }
     
+    // get loaded audio's num channels
+    audioParams->numChannels = (int)wavSpec.channels;
+    
     // get string name
     std::string file(audioParams->filename);
     file = getFilename(file);
@@ -718,7 +744,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         // see https://codeberg.org/soundtouch/soundtouch/src/branch/master/source/SoundStretch/main.cpp
         soundtouch::SoundTouch soundTouch;
         soundTouch.setSampleRate(audioParams->sampleRate);
-        soundTouch.setChannels(2);
+        soundTouch.setChannels(audioParams->numChannels);
         soundTouch.setPitchSemiTones(audioParams->pitchShiftAmount);
         
         audioData = pitchShift(
@@ -727,7 +753,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             soundTouch, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            audioParams->numChannels,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -738,7 +765,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             audioDataStart,
             audioDataLen,
             wavSpec.format,
-            wavSpec.freq);
+            wavSpec.freq,
+            audioParams->numChannels);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
     }
@@ -752,7 +780,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             audioParams->lowpassCutoff, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            2,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -768,7 +797,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             audioParams->highpassCutoff, 
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            2,
             !filterApplied);
         audioDataStart = (Uint8*)audioData.data();
         audioDataLen = (Uint32)audioData.size();
@@ -784,7 +814,8 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
             audioDataLen,
             wavSpec.format,
             wavSpec.freq, 
-            audioParams->sampleRate, 
+            audioParams->sampleRate,
+            2,
             !filterApplied);
             
         filterApplied = true;
@@ -795,7 +826,7 @@ DWORD WINAPI downloadAudioProc(LPVOID lpParam){
         writeWavToStream(stream, audioData, audioParams->sampleRate, 1); // 1 channel
     }else{
         std::cout << "no off-vocal\n";
-        writeWavToStream(stream, audioData, audioParams->sampleRate); // 2 channel
+        writeWavToStream(stream, audioData, audioParams->sampleRate, audioParams->numChannels); // 2 channel
     }
 
     SDL_FreeWAV(wavStart);
