@@ -835,7 +835,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         GetWindowText(textbox, filename, textLength + 1);
                         
                         if(audioParams->filename != NULL){
-                          delete[] audioParams->filename;
+                            delete[] audioParams->filename;
                         }
                         audioParams->filename = filename;
                         
@@ -855,6 +855,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
                         // need to wait for this thread to finish!
                         // otherwise this iteration of the message loop will be done right away and the thread dies prematurely 
                         //WaitForSingleObject(downloadThread, INFINITE);
+                    }
+                    break;
+                case ID_LOWPASS_CHECKBOX:
+                    {
+                        // if checked, turn off readonly for lowpass editbox else turn on readonly
+                        // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-isdlgbuttonchecked
+                        if(IsDlgButtonChecked(hwnd, ID_LOWPASS_CHECKBOX) == BST_CHECKED){
+                            SendDlgItemMessage(hwnd, ID_SPECIFY_LOWPASS_CUTOFF, EM_SETREADONLY, 0, 0);
+                        }else{
+                            SendDlgItemMessage(hwnd, ID_SPECIFY_LOWPASS_CUTOFF, EM_SETREADONLY, 1, 0);
+                        }
+                    }
+                    break;
+                case ID_HIGHPASS_CHECKBOX:
+                    {
+                        // if checked, turn off readonly for highpass editbox
+                        if(IsDlgButtonChecked(hwnd, ID_HIGHPASS_CHECKBOX) == BST_CHECKED){
+                            SendDlgItemMessage(hwnd, ID_SPECIFY_HIGHPASS_CUTOFF, EM_SETREADONLY, 0, 0);
+                        }else{
+                            SendDlgItemMessage(hwnd, ID_SPECIFY_HIGHPASS_CUTOFF, EM_SETREADONLY, 1, 0);
+                        }
                     }
                     break;
             }
@@ -1239,6 +1260,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         NULL
     );
     SendMessage(addLowPassCutoffEdit, WM_SETFONT, (WPARAM)hFont, true);
+    SendMessage(addLowPassCutoffEdit, EM_SETREADONLY, true, 0);
     
     // toggle highpass filter checkbox
     HWND highpassCheckBox = CreateWindow(
@@ -1280,6 +1302,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         NULL
     );
     SendMessage(addHighPassCutoffEdit, WM_SETFONT, (WPARAM)hFont, true);
+    SendMessage(addHighPassCutoffEdit, EM_SETREADONLY, true, 0);
     
     // toggle karaoke/off-vocal checkbox
     HWND checkBox2 = CreateWindow(
